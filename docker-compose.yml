@@ -1,0 +1,53 @@
+version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - phantom_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3008:3008"
+    environment:
+      - PORT=3008
+      - NODE_ENV=production
+      - DB_TYPE=sqlite
+      - DB_DATABASE=database.sqlite
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=phantom_secret_12345
+    depends_on:
+      - redis
+    volumes:
+      - backend_data:/app/data
+    networks:
+      - phantom_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:3008/api
+      - NEXT_PUBLIC_WS_URL=ws://backend:3008
+    depends_on:
+      - backend
+    networks:
+      - phantom_net
+
+volumes:
+  redis_data:
+  backend_data:
+
+networks:
+  phantom_net:
+    driver: bridge
