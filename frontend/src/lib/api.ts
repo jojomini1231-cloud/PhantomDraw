@@ -36,7 +36,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   return response.json();
 }
 
-export async function fetchAdminApi(endpoint: string, options: RequestInit = {}) {
+export async function fetchAdminApi<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const authStorageStr = typeof window !== 'undefined' ? localStorage.getItem('phantom-draw-admin-auth') : null;
   let token = null;
   

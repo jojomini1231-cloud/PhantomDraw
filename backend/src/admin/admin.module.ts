@@ -14,9 +14,13 @@ import { GalleryItem } from '../gallery/entities/gallery-item.entity';
 import { GalleryManagementController } from './gallery-management.controller';
 import { GalleryManagementService } from './gallery-management.service';
 
+import { Account } from './entities/account.entity';
+import { AccountPoolController } from './account-pool.controller';
+import { AccountPoolService } from './account-pool.service';
+
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AdminUser, AuditLog, ApiKey, GalleryItem]),
+    TypeOrmModule.forFeature([AdminUser, AuditLog, ApiKey, GalleryItem, Account]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -26,8 +30,8 @@ import { GalleryManagementService } from './gallery-management.service';
       }),
     }),
   ],
-  controllers: [AdminController, ApiKeyManagementController, GalleryManagementController],
-  providers: [AdminService, AdminJwtStrategy, ApiKeyManagementService, GalleryManagementService],
+  controllers: [AdminController, ApiKeyManagementController, GalleryManagementController, AccountPoolController],
+  providers: [AdminService, AdminJwtStrategy, ApiKeyManagementService, GalleryManagementService, AccountPoolService],
   exports: [AdminService],
 })
 export class AdminModule {}

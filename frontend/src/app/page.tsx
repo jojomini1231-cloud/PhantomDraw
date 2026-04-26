@@ -16,8 +16,17 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { io, Socket } from "socket.io-client";
+import { Suspense } from "react";
 
 export default function WorkspacePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <WorkspacePageContent />
+    </Suspense>
+  );
+}
+
+function WorkspacePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { token, updateQuota } = useAuthStore();
@@ -191,7 +200,7 @@ export default function WorkspacePage() {
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-sm flex items-center gap-2 text-slate-800">
                 <ImageIcon className="h-4 w-4 text-blue-500" />
-                {t.wsUploadImageTitle || '参考图 (图生图)'}
+                {(t as any).wsUploadImageTitle || '参考图 (图生图)'}
               </h3>
               {initImage && (
                 <Button 

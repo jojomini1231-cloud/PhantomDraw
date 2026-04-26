@@ -73,6 +73,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 密钥管理
               </Button>
             </Link>
+            <Link href="/admin/accounts">
+              <Button variant={pathname === "/admin/accounts" ? "secondary" : "ghost"} className="gap-2">
+                <Key className="h-4 w-4" />
+                号池管理
+              </Button>
+            </Link>
             <Link href="/admin/gallery">
               <Button variant={pathname === "/admin/gallery" ? "secondary" : "ghost"} className="gap-2">
                 <ImageIcon className="h-4 w-4" />

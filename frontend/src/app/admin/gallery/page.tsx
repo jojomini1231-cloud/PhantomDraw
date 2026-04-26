@@ -374,7 +374,7 @@ export default function GalleryManagement() {
                 <label className="text-sm font-medium text-slate-700">分类 <span className="text-red-500">*</span></label>
                 <Select
                   value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  onValueChange={(value) => setFormData({ ...formData, category: value || "" })}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="选择分类" />
@@ -391,10 +391,10 @@ export default function GalleryManagement() {
                 <label className="text-sm font-medium text-slate-700">类型 <span className="text-red-500">*</span></label>
                 <Select
                   value={formData.type}
-                  onValueChange={(value) => {
+                  onValueChange={(value: any) => {
                     setFormData({ 
                       ...formData, 
-                      type: value,
+                      type: value || 'free',
                       unlockQuota: value === 'free' ? 0 : (formData.unlockQuota > 0 ? formData.unlockQuota : 10)
                     })
                   }}

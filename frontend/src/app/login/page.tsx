@@ -144,8 +144,8 @@ export default function LoginPage() {
           </div>
           
           <DialogFooter className="sm:justify-center">
-            <DialogClose asChild>
-              <Button type="button" variant="secondary" className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 px-8">
+            <DialogClose>
+              <Button type="button" variant="secondary" className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-900 border-0">
                 {t.loginContactClose}
               </Button>
             </DialogClose>
