@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -18,32 +23,65 @@ export class GenerateService {
   ) {}
 
   async createTask(user: ApiKey, dto: CreateTaskDto) {
-    if (user.quota <= 0) {
-      throw new BadRequestException('Insufficient quota');
+    const multiplier = Math.max(1, user.multiplier ?? 10);
+    let task: GenerationTask | null = null;
+    let remainingQuota = user.quota;
+
+    await this.apiKeyRepository.manager.transaction(async (transactionalEntityManager) => {
+      const latestUser = await transactionalEntityManager.findOne(ApiKey, {
+        where: { id: user.id },
+      });
+
+      if (!latestUser) {
+        throw new NotFoundException('API key not found');
+      }
+
+      if (latestUser.quota < multiplier) {
+        throw new BadRequestException('Insufficient quota');
+      }
+
+      latestUser.quota -= multiplier;
+      await transactionalEntityManager.save(latestUser);
+
+      task = transactionalEntityManager.create(GenerationTask, {
+        type: dto.type,
+        prompt: dto.prompt,
+        negativePrompt: dto.negativePrompt,
+        initImage: dto.initImage,
+        model: dto.model || 'gpt-image-2',
+        size: dto.size,
+        status: 'pending',
+        apiKey: latestUser,
+      });
+      task = await transactionalEntityManager.save(task);
+      remainingQuota = latestUser.quota;
+    });
+
+    try {
+      const job = await this.imageQueue.add(
+        'generate',
+        { taskId: task.id },
+        { jobId: task.id },
+      );
+      console.log('Job added to queue:', job.id);
+    } catch (error) {
+      await this.apiKeyRepository.manager.transaction(async (transactionalEntityManager) => {
+        await transactionalEntityManager.increment(
+          ApiKey,
+          { id: user.id },
+          'quota',
+          multiplier,
+        );
+
+        if (task?.id) {
+          await transactionalEntityManager.delete(GenerationTask, { id: task.id });
+        }
+      });
+
+      throw new ServiceUnavailableException('Task queue unavailable, please retry');
     }
 
-    // Deduct quota
-    user.quota -= 1;
-    await this.apiKeyRepository.save(user);
-
-    // Create task
-    const task = this.taskRepository.create({
-      type: dto.type,
-      prompt: dto.prompt,
-      negativePrompt: dto.negativePrompt,
-      initImage: dto.initImage,
-      model: dto.model || 'gpt-image-2',
-      size: dto.size,
-      status: 'pending',
-      apiKey: user,
-    });
-    await this.taskRepository.save(task);
-
-    // Push to queue
-    const job = await this.imageQueue.add('generate', { taskId: task.id });
-    console.log('Job added to queue:', job.id);
-
-    return { taskId: task.id, status: task.status, remainingQuota: user.quota };
+    return { taskId: task.id, status: task.status, remainingQuota };
   }
 
   async getTaskStatus(taskId: string, user: ApiKey) {
