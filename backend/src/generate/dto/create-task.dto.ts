@@ -24,4 +24,8 @@ export class CreateTaskDto {
   @IsString()
   @IsOptional()
   model?: string;
+
+  @IsString()
+  @IsOptional()
+  size?: string;
 }

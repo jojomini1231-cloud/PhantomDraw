@@ -33,6 +33,7 @@ export class GenerateService {
       negativePrompt: dto.negativePrompt,
       initImage: dto.initImage,
       model: dto.model || 'gpt-image-2',
+      size: dto.size,
       status: 'pending',
       apiKey: user,
     });
@@ -57,10 +58,31 @@ export class GenerateService {
     return task;
   }
   
-  async getHistory(user: ApiKey) {
-    return this.taskRepository.find({
+  async getHistory(
+    user: ApiKey,
+    options: { limit?: string; offset?: string } = {},
+  ) {
+    const parsedLimit = Number.parseInt(options.limit || '24', 10);
+    const parsedOffset = Number.parseInt(options.offset || '0', 10);
+    const take = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 50)
+      : 24;
+    const skip = Number.isFinite(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
+
+    const [items, total] = await this.taskRepository.findAndCount({
       where: { apiKey: { id: user.id } },
       order: { createdAt: 'DESC' },
+      take,
+      skip,
     });
+
+    return {
+      items,
+      total,
+      limit: take,
+      offset: skip,
+      hasMore: skip + items.length < total,
+      nextOffset: skip + items.length,
+    };
   }
 }

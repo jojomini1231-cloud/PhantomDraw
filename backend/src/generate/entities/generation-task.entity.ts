@@ -25,10 +25,16 @@ export class GenerationTask {
   model: string;
 
   @Column({ nullable: true })
+  size: string;
+
+  @Column({ nullable: true })
   imageUrl: string;
 
   @Column({ nullable: true })
   errorReason: string;
+
+  @Column({ nullable: true })
+  providerName: string;
 
   @ManyToOne(() => ApiKey)
   apiKey: ApiKey;

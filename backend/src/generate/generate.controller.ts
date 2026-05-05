@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { GenerateService } from './generate.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -14,8 +14,12 @@ export class GenerateController {
   }
 
   @Get('history')
-  async getHistory(@Req() req: any) {
-    return this.generateService.getHistory(req.user);
+  async getHistory(
+    @Req() req: any,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.generateService.getHistory(req.user, { limit, offset });
   }
 
   @Get(':id')
