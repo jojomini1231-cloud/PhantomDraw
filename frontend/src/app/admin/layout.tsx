@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAdminAuthStore } from "@/store/adminAuthStore";
-import { ShieldAlert, Loader2, Key, LayoutDashboard, Image as ImageIcon } from "lucide-react";
+import { ShieldAlert, Loader2, Key, LayoutDashboard, Image as ImageIcon, Server, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -83,6 +83,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Button variant={pathname === "/admin/gallery" ? "secondary" : "ghost"} className="gap-2">
                 <ImageIcon className="h-4 w-4" />
                 灵感画廊
+              </Button>
+            </Link>
+            <Link href="/admin/providers">
+              <Button variant={pathname === "/admin/providers" ? "secondary" : "ghost"} className="gap-2">
+                <Server className="h-4 w-4" />
+                供应商管理
+              </Button>
+            </Link>
+            <Link href="/admin/generation-logs">
+              <Button variant={pathname === "/admin/generation-logs" ? "secondary" : "ghost"} className="gap-2">
+                <FileText className="h-4 w-4" />
+                调用日志
               </Button>
             </Link>
           </nav>

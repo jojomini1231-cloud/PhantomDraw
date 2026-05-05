@@ -6,9 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useLangStore } from "@/store/langStore";
 import { translations } from "@/lib/i18n";
-import { Button } from "@/components/ui/button";
 import {
-  Image as ImageIcon,
   LayoutGrid,
   LogOut,
   Settings,
@@ -17,7 +15,6 @@ import {
   Hexagon,
   History,
   Sparkles,
-  Sun,
   Coins,
   Globe,
   ChevronDown,
@@ -50,7 +47,8 @@ export function Navbar() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => setMounted(true));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const handleLogout = () => {
@@ -78,21 +76,21 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-white/80 backdrop-blur-xl">
-      <div className="flex h-14 items-center px-4 lg:px-6 w-full max-w-[1920px] mx-auto">
+      <div className="mx-auto flex h-14 w-full max-w-[1920px] items-center px-4 lg:px-6">
         {/* Left: Logo */}
-        <div className="flex items-center w-auto lg:w-64 shrink-0">
+        <div className="flex w-auto shrink-0 items-center lg:w-64">
           <Link href="/" className="flex items-center gap-2.5 group">
             <div className="bg-primary rounded-lg p-1.5 group-hover:bg-brand transition-colors duration-200">
               <Hexagon className="h-4 w-4 text-primary-foreground fill-primary-foreground/20" />
             </div>
-            <span className="font-bold tracking-tight text-base hidden sm:block">
+            <span className="hidden text-base font-bold sm:block">
               PhantomDraw
             </span>
           </Link>
         </div>
 
         {/* Center: Navigation */}
-        <div className="flex-1 flex justify-center">
+        <div className="flex min-w-0 flex-1 justify-center">
           <nav className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border border-border/50">
             {navItems.map((item) => {
               const isActive =
@@ -119,40 +117,46 @@ export function Navbar() {
         </div>
 
         {/* Right: Controls */}
-        <div className="flex items-center justify-end gap-2 w-auto lg:w-64 shrink-0">
+        <div className="flex w-auto min-w-fit shrink-0 items-center justify-end gap-2">
           {/* Desktop controls */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden flex-nowrap items-center gap-2 md:flex">
             {/* Model badge */}
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-muted/50 px-2.5 py-1.5 rounded-md border border-border/50">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-              <span className="hidden lg:inline">GPT-Image-2</span>
+            <div className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-border/50 bg-muted/50 px-2.5 text-xs font-medium text-muted-foreground">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+              <span className="hidden whitespace-nowrap lg:inline">
+                GPT-Image-2
+              </span>
             </div>
 
             {/* Quota */}
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-muted/50 px-2.5 py-1.5 rounded-md border border-border/50">
-              <Coins className="h-3 w-3 text-brand" />
+            <div className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-border/50 bg-muted/50 px-2.5 text-xs font-medium text-muted-foreground">
+              <Coins className="h-3 w-3 shrink-0 text-brand" />
               <span>{quota}</span>
             </div>
 
             {/* Language toggle */}
             <button
               onClick={toggleLanguage}
-              className="flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted/50 px-2.5 py-1.5 rounded-md border border-border/50 hover:bg-muted hover:text-foreground transition-colors"
+              className="flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border/50 bg-muted/50 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              <Globe className="h-3 w-3" />
-              <span>{language === "zh" ? "EN" : "中文"}</span>
+              <Globe className="h-3 w-3 shrink-0" />
+              <span className="whitespace-nowrap">
+                {language === "zh" ? "EN" : "中文"}
+              </span>
             </button>
 
             {/* Key status */}
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-muted/50 px-2.5 py-1.5 rounded-md border border-border/50">
-              <Key className="h-3 w-3 text-emerald-500" />
-              <span className="hidden lg:inline">{t.navKeyConfigured}</span>
+            <div className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-border/50 bg-muted/50 px-2.5 text-xs font-medium text-muted-foreground">
+              <Key className="h-3 w-3 shrink-0 text-emerald-500" />
+              <span className="hidden whitespace-nowrap lg:inline">
+                {t.navKeyConfigured}
+              </span>
             </div>
           </div>
 
           {/* Account dropdown */}
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-1.5 h-8 px-2 rounded-lg border border-border bg-white hover:bg-muted/50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20">
+            <DropdownMenuTrigger className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-white px-2 transition-colors hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/20">
               <div className="h-5 w-5 rounded-md bg-muted flex items-center justify-center">
                 <User className="h-3 w-3 text-muted-foreground" />
               </div>
