@@ -17,10 +17,16 @@ import { GalleryManagementService } from './gallery-management.service';
 import { Account } from './entities/account.entity';
 import { AccountPoolController } from './account-pool.controller';
 import { AccountPoolService } from './account-pool.service';
+import { Provider } from './entities/provider.entity';
+import { ProviderManagementController } from './provider-management.controller';
+import { ProviderManagementService } from './provider-management.service';
+import { GenerationLogController } from './generation-log.controller';
+import { GenerationLogService } from './generation-log.service';
+import { GenerationTask } from '../generate/entities/generation-task.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AdminUser, AuditLog, ApiKey, GalleryItem, Account]),
+    TypeOrmModule.forFeature([AdminUser, AuditLog, ApiKey, GalleryItem, Account, Provider, GenerationTask]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -30,8 +36,8 @@ import { AccountPoolService } from './account-pool.service';
       }),
     }),
   ],
-  controllers: [AdminController, ApiKeyManagementController, GalleryManagementController, AccountPoolController],
-  providers: [AdminService, AdminJwtStrategy, ApiKeyManagementService, GalleryManagementService, AccountPoolService],
-  exports: [AdminService],
+  controllers: [AdminController, ApiKeyManagementController, GalleryManagementController, AccountPoolController, ProviderManagementController, GenerationLogController],
+  providers: [AdminService, AdminJwtStrategy, ApiKeyManagementService, GalleryManagementService, AccountPoolService, ProviderManagementService, GenerationLogService],
+  exports: [AdminService, AccountPoolService, ProviderManagementService],
 })
 export class AdminModule {}

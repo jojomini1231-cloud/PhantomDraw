@@ -16,6 +16,33 @@ export class AccountPoolService {
     return this.accountRepository.find({ order: { createdAt: 'DESC' } });
   }
 
+  async getAvailableAccount() {
+    const account = await this.accountRepository.findOne({
+      where: { status: '正常' },
+      order: { quota: 'DESC' },
+    });
+    if (!account || account.quota <= 0) return null;
+    return account;
+  }
+
+  async decrementQuota(id: string) {
+    const account = await this.accountRepository.findOne({ where: { id } });
+    if (account && account.quota > 0) {
+      account.quota -= 1;
+      account.success += 1;
+      if (account.quota === 0) account.status = '限流';
+      await this.accountRepository.save(account);
+    }
+  }
+
+  async incrementFail(id: string) {
+    const account = await this.accountRepository.findOne({ where: { id } });
+    if (account) {
+      account.fail += 1;
+      await this.accountRepository.save(account);
+    }
+  }
+
   async addAccounts(tokens: string[]) {
     const cleanedTokens = [...new Set(tokens.map((t) => t.trim()).filter((t) => t))];
     let added = 0;
