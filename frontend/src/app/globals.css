@@ -134,6 +134,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
   }
   html {
     @apply font-sans;
@@ -186,6 +188,32 @@
     pointer-events: none;
     z-index: 0;
   }
+
+  .studio-workspace {
+    background:
+      linear-gradient(rgba(24, 24, 27, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(24, 24, 27, 0.035) 1px, transparent 1px),
+      var(--background);
+    background-size: 32px 32px;
+  }
+
+  .studio-canvas {
+    background:
+      linear-gradient(rgba(24, 24, 27, 0.028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(24, 24, 27, 0.028) 1px, transparent 1px);
+    background-size: 28px 28px, 28px 28px;
+  }
+
+  .studio-preview-grid {
+    background-image:
+      linear-gradient(rgba(24, 24, 27, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(24, 24, 27, 0.04) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
 }
 
 /* Smooth page transitions */
@@ -201,5 +229,16 @@
   :focus-visible {
     outline: 2px solid #18181B;
     outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
