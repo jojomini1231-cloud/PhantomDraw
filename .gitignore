@@ -51,3 +51,10 @@ database.sqlite
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code / Codex
+.claude/
+.codex
+
+# Generated reports
+RISK_REVIEW_REPORT.md
