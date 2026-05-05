@@ -6,9 +6,20 @@ import { useLangStore } from "@/store/langStore";
 import { translations } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Copy, Sparkles, Lock, Unlock, Loader2, AlertCircle } from "lucide-react";
+import {
+  Copy,
+  Sparkles,
+  Lock,
+  Unlock,
+  Loader2,
+  AlertCircle,
+  ArrowRight,
+  RefreshCw,
+  LayoutGrid,
+  Eye,
+} from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { toast } from "sonner";
 import { fetchApi } from "@/lib/api";
 import {
@@ -38,19 +49,28 @@ export default function GalleryPage() {
   const { language } = useLangStore();
   const t = translations[language];
   const router = useRouter();
-  
+
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState("全部");
-  
+
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
 
-  const CATEGORIES = ["全部", "人物", "风景", "建筑", "二次元", "3D", "摄影", "其他"];
+  const CATEGORIES = [
+    { key: "全部", label: t.galAll },
+    { key: "人物", label: t.galCharacters },
+    { key: "风景", label: t.galScenery },
+    { key: "建筑", label: t.galArchitecture },
+    { key: "二次元", label: t.galAnime },
+    { key: "3D", label: t.gal3D },
+    { key: "摄影", label: t.galPhotography },
+    { key: "其他", label: t.galOther },
+  ];
 
   useEffect(() => {
     setMounted(true);
@@ -66,14 +86,15 @@ export default function GalleryPage() {
     if (!token) return;
     try {
       setLoading(true);
-      const url = activeCategory === "全部" 
-        ? "/gallery?limit=50" 
-        : `/gallery?limit=50&category=${encodeURIComponent(activeCategory)}`;
+      setError(null);
+      const url =
+        activeCategory === "全部"
+          ? "/gallery?limit=50"
+          : `/gallery?limit=50&category=${encodeURIComponent(activeCategory)}`;
       const data = await fetchApi(url);
       setItems(data.items);
     } catch (err: any) {
-      setError(err.message || "获取画廊失败");
-      toast.error("获取画廊失败");
+      setError(err.message || "Failed to load gallery");
     } finally {
       setLoading(false);
     }
@@ -87,20 +108,20 @@ export default function GalleryPage() {
     setSelectedItem(item);
     setIsDialogOpen(true);
     setDetailLoading(true);
-    
+
     try {
       const data = await fetchApi(`/gallery/${item.id}`);
       setSelectedItem(data);
     } catch (err: any) {
-      toast.error(err.message || "获取详情失败");
+      toast.error(err.message || "Failed to load details");
     } finally {
       setDetailLoading(false);
     }
   };
 
-  const handleCopy = (text: string, lang: string) => {
+  const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success(`${language === 'zh' ? lang : ''} ${t.galCopied} ${language === 'en' ? lang : ''}`);
+    toast.success(t.galCopied);
   };
 
   const handleUnlock = async (id: string, requiredQuota: number) => {
@@ -114,150 +135,215 @@ export default function GalleryPage() {
       const res = await fetchApi(`/gallery/${id}/unlock`, { method: "POST" });
       updateQuota(res.remainingQuota);
       toast.success(t.galUnlockSuccess);
-      
-      // Refresh the list to update lock status
+
       fetchGallery();
-      
-      // Refetch current details
+
       const data = await fetchApi(`/gallery/${id}`);
       setSelectedItem(data);
     } catch (err: any) {
-      toast.error(err.message || "解锁失败");
+      toast.error(err.message || "Unlock failed");
     } finally {
       setUnlocking(false);
     }
   };
 
   const handleTryIt = (prompt: string) => {
-    // navigator.clipboard.writeText(prompt); // Removed clipboard copy as we use query param now
     toast.info(t.galTryInfo);
     setIsDialogOpen(false);
     setTimeout(() => {
-      // Use query parameter to pass the prompt to the workspace
       router.push(`/?prompt=${encodeURIComponent(prompt)}`);
     }, 300);
   };
 
   if (!mounted || !token) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-canvas">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-800 mb-2">{t.galTitle}</h1>
-        <p className="text-slate-500">{t.galSubtitle}</p>
-      </div>
-
-      {/* Filter Pills */}
-      <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2 scrollbar-hide">
-        {CATEGORIES.map(cat => (
-          <Button 
-            key={cat}
-            variant={activeCategory === cat ? "default" : "outline"} 
-            className={`rounded-full ${
-              activeCategory === cat 
-                ? "bg-slate-800 text-white hover:bg-slate-700" 
-                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-            }`}
-            onClick={() => setActiveCategory(cat)}
-          >
-            {cat === "全部" ? t.galAll : cat}
-          </Button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <Loader2 className="h-10 w-10 animate-spin mb-4 text-blue-500" />
-          <p>加载中...</p>
-        </div>
-      ) : error ? (
-        <div className="flex flex-col items-center justify-center py-20 text-red-500 bg-red-50 rounded-2xl border border-red-100">
-          <AlertCircle className="h-10 w-10 mb-4" />
-          <p>{error}</p>
-        </div>
-      ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 bg-white rounded-3xl border border-slate-200 shadow-sm text-center">
-          <div className="h-24 w-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-            <Sparkles className="h-10 w-10 text-slate-300" />
+    <div className="min-h-[calc(100vh-3.5rem)] bg-canvas">
+      <div className="container mx-auto px-4 lg:px-6 py-8 max-w-7xl">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-10 w-10 rounded-xl bg-purple/10 flex items-center justify-center">
+              <LayoutGrid className="h-5 w-5 text-purple" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {t.galTitle}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {t.galSubtitle}
+              </p>
+            </div>
           </div>
-          <h3 className="text-xl font-medium text-slate-700 mb-2">暂无画廊内容</h3>
-          <p className="text-slate-500">该分类下暂无作品，去其他分类看看吧</p>
         </div>
-      ) : (
-        <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-6 space-y-6">
-          {items.map((item) => (
-            <Card 
-              key={item.id} 
-              className="break-inside-avoid overflow-hidden border-border bg-card/50 hover:bg-card/80 transition-colors group cursor-pointer"
-              onClick={() => handleCardClick(item)}
+
+        {/* Filter Pills */}
+        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.key}
+              onClick={() => setActiveCategory(cat.key)}
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 border ${
+                activeCategory === cat.key
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-white text-muted-foreground border-border hover:text-foreground hover:border-foreground/20"
+              }`}
             >
-              <div className="relative">
-                <img
-                  src={item.imageUrl}
-                  alt={item.title}
-                  className="w-full h-auto object-cover min-h-[200px] bg-slate-100"
-                  loading="lazy"
-                />
-                {!item.isUnlocked && (
-                  <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md rounded-full p-1.5 shadow-sm">
-                    <Lock className="h-4 w-4 text-white/90" />
-                  </div>
-                )}
-              </div>
-              
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-base line-clamp-1 flex-1 mr-2 text-slate-800" title={item.title}>
-                    {item.title}
-                  </h3>
-                  {item.type === 'free' ? (
-                    <span className="text-[10px] uppercase tracking-wider font-bold bg-emerald-500/10 text-emerald-600 px-2 py-1 rounded-md shrink-0">{t.galFree}</span>
-                  ) : item.isUnlocked ? (
-                    <span className="text-[10px] uppercase tracking-wider font-bold bg-blue-500/10 text-blue-600 px-2 py-1 rounded-md flex items-center gap-1 shrink-0">
-                      <Unlock className="h-3 w-3" /> {t.galUnlocked}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            </Card>
+              {cat.label}
+            </button>
           ))}
         </div>
-      )}
 
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-32">
+            <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+              <Loader2 className="h-7 w-7 animate-spin text-purple" />
+            </div>
+            <p className="text-sm text-muted-foreground font-medium">
+              {t.galLoading}
+            </p>
+          </div>
+        ) : error ? (
+          /* Error State */
+          <div className="flex flex-col items-center justify-center py-32">
+            <div className="h-16 w-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+              <AlertCircle className="h-7 w-7 text-destructive" />
+            </div>
+            <h3 className="text-lg font-semibold mb-1">{t.galErrorTitle}</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-md text-center">
+              {error.includes("401") || error.includes("Unauthorized")
+                ? t.galUnauthorizedDesc
+                : t.galErrorDesc}
+            </p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={fetchGallery}>
+                <RefreshCw className="h-4 w-4 mr-1.5" />
+                {t.galRetry}
+              </Button>
+              <Button render={<Link href="/" />}>
+                <ArrowRight className="h-4 w-4 mr-1.5" />
+                {t.galBackToWork}
+              </Button>
+            </div>
+          </div>
+        ) : items.length === 0 ? (
+          /* Empty State */
+          <div className="flex flex-col items-center justify-center py-32">
+            <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-purple/10 to-brand/10 flex items-center justify-center mb-6 border border-purple/10">
+              <Sparkles className="h-8 w-8 text-purple" />
+            </div>
+            <h3 className="text-lg font-semibold mb-1">{t.galEmpty}</h3>
+            <p className="text-sm text-muted-foreground max-w-sm text-center">
+              {t.galEmptyDesc}
+            </p>
+          </div>
+        ) : (
+          /* Masonry Grid */
+          <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-4 lg:gap-5 space-y-4 lg:space-y-5">
+            {items.map((item) => (
+              <div
+                key={item.id}
+                className="break-inside-avoid overflow-hidden rounded-xl bg-white border border-border shadow-sm hover:shadow-md transition-all duration-200 group cursor-pointer"
+                onClick={() => handleCardClick(item)}
+              >
+                {/* Image */}
+                <div className="relative overflow-hidden">
+                  <img
+                    src={item.imageUrl}
+                    alt={item.title}
+                    className="w-full h-auto object-cover min-h-[200px] bg-muted/30"
+                    loading="lazy"
+                  />
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                    <div className="h-10 w-10 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center">
+                      <Eye className="h-5 w-5 text-foreground" />
+                    </div>
+                  </div>
+                  {/* Lock icon */}
+                  {!item.isUnlocked && item.type !== "free" && (
+                    <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-md rounded-lg p-1.5">
+                      <Lock className="h-3.5 w-3.5 text-white" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="p-3.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3
+                      className="font-medium text-sm line-clamp-1 flex-1"
+                      title={item.title}
+                    >
+                      {item.title}
+                    </h3>
+                    {item.type === "free" ? (
+                      <span className="text-[10px] font-semibold uppercase tracking-wider bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
+                        {t.galFree}
+                      </span>
+                    ) : item.isUnlocked ? (
+                      <span className="text-[10px] font-semibold uppercase tracking-wider bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1 shrink-0">
+                        <Unlock className="h-2.5 w-2.5" />
+                        {t.galUnlocked}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold uppercase tracking-wider bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md border border-amber-200 shrink-0">
+                        {t.galPremiumPrompt}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Detail Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[1100px] p-0 overflow-hidden bg-white border-slate-100 shadow-2xl">
+        <DialogContent className="sm:max-w-[1100px] p-0 overflow-hidden bg-white border-border shadow-2xl">
           {selectedItem && (
             <div className="flex flex-col md:flex-row h-[85vh] sm:h-[80vh] max-h-[800px]">
-              <div className="w-full md:w-[55%] bg-slate-100/50 relative min-h-[400px] md:min-h-full flex items-center justify-center">
+              {/* Image side */}
+              <div className="w-full md:w-[55%] bg-muted/20 relative min-h-[300px] md:min-h-full flex items-center justify-center">
                 <img
                   src={selectedItem.imageUrl}
                   alt={selectedItem.title}
                   className="w-full h-full object-contain absolute inset-0 p-4"
                 />
               </div>
-              
+
+              {/* Info side */}
               <div className="w-full md:w-[45%] p-6 md:p-8 flex flex-col h-full overflow-y-auto">
                 <DialogHeader className="mb-4 text-left">
-                  <DialogTitle className="text-2xl font-bold text-slate-800">{selectedItem.title}</DialogTitle>
-                  <DialogDescription className="flex items-center gap-2 mt-2">
-                    <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-xs font-medium">{selectedItem.category}</span>
-                    {selectedItem.type === 'free' ? (
-                      <span className="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1">
-                        <Unlock className="h-3 w-3" /> 免费
+                  <DialogTitle className="text-xl font-bold">
+                    {selectedItem.title}
+                  </DialogTitle>
+                  <DialogDescription className="flex items-center gap-2 mt-2 flex-wrap">
+                    <span className="bg-muted px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground">
+                      {selectedItem.category}
+                    </span>
+                    {selectedItem.type === "free" ? (
+                      <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 border border-emerald-200">
+                        <Unlock className="h-3 w-3" />
+                        {t.galFree}
                       </span>
                     ) : selectedItem.isUnlocked ? (
-                      <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1">
-                        <Unlock className="h-3 w-3" /> 已解锁
+                      <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 border border-blue-200">
+                        <Unlock className="h-3 w-3" />
+                        {t.galUnlocked}
                       </span>
                     ) : (
-                      <span className="bg-amber-50 text-amber-600 px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1">
-                        <Lock className="h-3 w-3" /> 高级提示词
+                      <span className="bg-amber-50 text-amber-700 px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 border border-amber-200">
+                        <Lock className="h-3 w-3" />
+                        {t.galPremiumPrompt}
                       </span>
                     )}
                   </DialogDescription>
@@ -265,90 +351,120 @@ export default function GalleryPage() {
 
                 <div className="flex-1 flex flex-col justify-center py-4">
                   {detailLoading ? (
-                    <div className="flex flex-col items-center justify-center text-slate-400 py-10">
-                      <Loader2 className="h-8 w-8 animate-spin mb-4 text-blue-500" />
-                      <p className="text-sm">加载详情中...</p>
-                    </div>
-                  ) : !selectedItem.isUnlocked ? (
-                    <div className="flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-2xl border border-slate-100 h-full">
-                      <Lock className="h-12 w-12 text-slate-300 mb-4" />
-                      <h3 className="text-lg font-semibold text-slate-700 mb-2">解锁提示词详情</h3>
-                      <p className="text-sm text-slate-500 mb-6 max-w-[250px]">
-                        该作品使用了高级提示词，需要支付额度才能查看并使用。
+                    <div className="flex flex-col items-center justify-center py-10">
+                      <Loader2 className="h-7 w-7 animate-spin text-brand mb-3" />
+                      <p className="text-sm text-muted-foreground">
+                        {t.galLoading}
                       </p>
-                      <Button 
-                        onClick={() => handleUnlock(selectedItem.id, selectedItem.unlockQuota)} 
-                        className="w-full max-w-[200px] bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm h-11"
+                    </div>
+                  ) : !selectedItem.isUnlocked &&
+                    selectedItem.type !== "free" ? (
+                    /* Locked state */
+                    <div className="flex flex-col items-center justify-center text-center p-6 bg-muted/30 rounded-2xl border border-border h-full">
+                      <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+                        <Lock className="h-7 w-7 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-base font-semibold mb-2">
+                        {t.galUnlockToView}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-6 max-w-[260px]">
+                        {t.galUnlockHint}
+                      </p>
+                      <Button
+                        onClick={() =>
+                          handleUnlock(
+                            selectedItem.id,
+                            selectedItem.unlockQuota
+                          )
+                        }
+                        className="w-full max-w-[220px] bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl h-11"
                         disabled={unlocking}
                       >
-                        {unlocking ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Unlock className="h-4 w-4 mr-2" />}
-                        支付 {selectedItem.unlockQuota} 额度解锁
+                        {unlocking ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Unlock className="h-4 w-4 mr-2" />
+                        )}
+                        {t.galUnlockCost.replace(
+                          "{quota}",
+                          String(selectedItem.unlockQuota)
+                        )}
                       </Button>
                     </div>
                   ) : (
-                    <div className="space-y-6">
-                      <div className="space-y-4">
-                        {/* 英文提示词 */}
-                        <div className="space-y-3">
-                          <h4 className="text-sm font-semibold text-slate-700 flex items-center justify-between">
-                            <span className="flex items-center gap-2">
-                              <Sparkles className="h-4 w-4 text-blue-500" />
-                              英文提示词 (Prompt)
-                            </span>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              onClick={() => handleCopy(selectedItem.promptEn || '', 'English')}
-                            >
-                              <Copy className="h-3 w-3 mr-1" />
-                              复制
-                            </Button>
+                    /* Unlocked state */
+                    <div className="space-y-5">
+                      {/* English Prompt */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold flex items-center gap-2">
+                            <Sparkles className="h-3.5 w-3.5 text-brand" />
+                            {t.galPromptEn}
                           </h4>
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
-                            <p 
-                              className="text-sm leading-relaxed text-slate-600 break-words line-clamp-6"
-                              title={selectedItem.promptEn || ''}
-                            >
-                              {selectedItem.promptEn || '暂无英文提示词'}
-                            </p>
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-brand hover:text-brand-dark hover:bg-brand-light"
+                            onClick={() =>
+                              handleCopy(selectedItem.promptEn || "")
+                            }
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            {t.galCopied.split(" ")[0]}
+                          </Button>
                         </div>
-
-                        {/* 中文提示词 */}
-                        <div className="space-y-3">
-                          <h4 className="text-sm font-semibold text-slate-700 flex items-center justify-between">
-                            <span className="flex items-center gap-2">
-                              <Sparkles className="h-4 w-4 text-blue-500" />
-                              中文提示词
-                            </span>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              onClick={() => handleCopy(selectedItem.promptZh || '', 'Chinese')}
-                            >
-                              <Copy className="h-3 w-3 mr-1" />
-                              复制
-                            </Button>
-                          </h4>
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
-                            <p 
-                              className="text-sm leading-relaxed text-slate-600 break-words line-clamp-4"
-                              title={selectedItem.promptZh || ''}
-                            >
-                              {selectedItem.promptZh || '暂无中文提示词'}
-                            </p>
-                          </div>
+                        <div className="bg-muted/30 p-4 rounded-xl border border-border">
+                          <p
+                            className="text-sm leading-relaxed text-foreground break-words line-clamp-6"
+                            title={selectedItem.promptEn || ""}
+                          >
+                            {selectedItem.promptEn || t.galNoPrompt}
+                          </p>
                         </div>
                       </div>
-                      
-                      <div className="pt-4 mt-auto">
-                        <Button 
-                          onClick={() => handleTryIt(language === 'zh' ? selectedItem.promptZh! : selectedItem.promptEn!)} 
-                          className="w-full h-12 bg-slate-800 hover:bg-slate-900 text-white rounded-xl shadow-md transition-all text-base font-medium"
+
+                      {/* Chinese Prompt */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold flex items-center gap-2">
+                            <Sparkles className="h-3.5 w-3.5 text-purple" />
+                            {t.galPromptZh}
+                          </h4>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-purple hover:text-purple-dark hover:bg-purple-light"
+                            onClick={() =>
+                              handleCopy(selectedItem.promptZh || "")
+                            }
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            {t.galCopied.split(" ")[0]}
+                          </Button>
+                        </div>
+                        <div className="bg-muted/30 p-4 rounded-xl border border-border">
+                          <p
+                            className="text-sm leading-relaxed text-foreground break-words line-clamp-4"
+                            title={selectedItem.promptZh || ""}
+                          >
+                            {selectedItem.promptZh || t.galNoPrompt}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Try it button */}
+                      <div className="pt-2 mt-auto">
+                        <Button
+                          onClick={() =>
+                            handleTryIt(
+                              language === "zh"
+                                ? selectedItem.promptZh!
+                                : selectedItem.promptEn!
+                            )
+                          }
+                          className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium shadow-sm"
                         >
-                          <Sparkles className="h-4 w-4 mr-2 text-blue-400" />
+                          <Sparkles className="h-4 w-4 mr-2" />
                           {t.galTryPrompt}
                         </Button>
                       </div>

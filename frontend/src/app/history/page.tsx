@@ -5,7 +5,17 @@ import { useAuthStore } from "@/store/authStore";
 import { useLangStore } from "@/store/langStore";
 import { translations } from "@/lib/i18n";
 import { fetchApi } from "@/lib/api";
-import { Loader2, AlertCircle, Clock, Download, Image as ImageIcon } from "lucide-react";
+import {
+  Loader2,
+  AlertCircle,
+  Clock,
+  Download,
+  Image as ImageIcon,
+  ArrowRight,
+  RefreshCw,
+  LogIn,
+  Sparkles,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,7 +39,7 @@ export default function HistoryPage() {
   const { language } = useLangStore();
   const t = translations[language];
   const router = useRouter();
-  
+
   const [tasks, setTasks] = useState<HistoryTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,140 +55,230 @@ export default function HistoryPage() {
     }
   }, [mounted, token, router]);
 
-  useEffect(() => {
+  const loadHistory = async () => {
     if (!token) return;
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await fetchApi("/generate/history");
+      setTasks(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to load history");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const loadHistory = async () => {
-      try {
-        setIsLoading(true);
-        const data = await fetchApi("/generate/history");
-        setTasks(data);
-      } catch (err: any) {
-        setError(err.message || "Failed to load history");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
+  useEffect(() => {
     loadHistory();
   }, [token]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+    return new Intl.DateTimeFormat(
+      language === "zh" ? "zh-CN" : "en-US",
+      {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+    ).format(date);
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
-      case 'success': return t.histSuccess;
-      case 'failed': return t.histFailed;
-      default: return t.histPending;
+      case "success":
+        return {
+          text: t.histSuccess,
+          bg: "bg-emerald-50",
+          text_color: "text-emerald-700",
+          border: "border-emerald-200",
+          dot: "bg-emerald-500",
+        };
+      case "failed":
+        return {
+          text: t.histFailed,
+          bg: "bg-red-50",
+          text_color: "text-red-700",
+          border: "border-red-200",
+          dot: "bg-red-500",
+        };
+      default:
+        return {
+          text: t.histPending,
+          bg: "bg-amber-50",
+          text_color: "text-amber-700",
+          border: "border-amber-200",
+          dot: "bg-amber-500",
+        };
     }
   };
 
-  if (!token) return null;
+  if (!mounted || !token) return null;
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
-          <Clock className="h-8 w-8 text-blue-500" />
-          {t.histTitle}
-        </h1>
-        <p className="text-slate-500 mt-2">{t.histSubtitle}</p>
-      </div>
-
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <Loader2 className="h-10 w-10 animate-spin mb-4 text-blue-500" />
-          <p>{t.histLoading}</p>
-        </div>
-      ) : error ? (
-        <div className="flex flex-col items-center justify-center py-20 text-red-500 bg-red-50 rounded-2xl border border-red-100">
-          <AlertCircle className="h-10 w-10 mb-4" />
-          <p>{error}</p>
-        </div>
-      ) : tasks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 bg-white rounded-3xl border border-slate-200 shadow-sm text-center">
-          <div className="h-24 w-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-            <ImageIcon className="h-10 w-10 text-slate-300" />
-          </div>
-          <h3 className="text-xl font-medium text-slate-700 mb-2">{t.histEmpty}</h3>
-          <Link href="/" className="mt-6 bg-blue-600 hover:bg-blue-700 text-white rounded-full px-8 py-2.5 text-sm font-medium transition-colors shadow-sm">
-            {t.histGoCreate}
-          </Link>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {tasks.map((task) => (
-            <div key={task.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all group">
-              <div className="aspect-square relative bg-slate-100 border-b border-slate-100 flex items-center justify-center">
-                {task.status === 'success' && task.imageUrl ? (
-                  <>
-                    <Image 
-                      src={task.imageUrl} 
-                      alt={task.prompt} 
-                      fill 
-                      className="object-cover"
-                      unoptimized
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <a href={task.imageUrl} target="_blank" download className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-800 shadow-lg hover:scale-110 transition-transform">
-                        <Download className="h-5 w-5" />
-                      </a>
-                    </div>
-                  </>
-                ) : task.status === 'failed' ? (
-                  <div className="text-red-400 flex flex-col items-center p-4 text-center">
-                    <AlertCircle className="h-8 w-8 mb-2" />
-                    <span className="text-xs">{task.errorReason || t.histFailed}</span>
-                  </div>
-                ) : (
-                  <div className="text-blue-500 flex flex-col items-center">
-                    <Loader2 className="h-8 w-8 animate-spin mb-2" />
-                    <span className="text-xs">{t.histPending}</span>
-                  </div>
-                )}
-                
-                {/* Status Badge */}
-                <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-medium backdrop-blur-md shadow-sm ${
-                  task.status === 'success' ? 'bg-emerald-500/90 text-white' : 
-                  task.status === 'failed' ? 'bg-red-500/90 text-white' : 
-                  'bg-blue-500/90 text-white'
-                }`}>
-                  {getStatusText(task.status)}
-                </div>
-              </div>
-              
-              <div className="p-4">
-                <p className="text-sm font-medium text-slate-800 line-clamp-2 mb-3 leading-snug" title={task.prompt}>
-                  {task.prompt}
-                </p>
-                
-                <div className="grid grid-cols-2 gap-y-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <div className="flex flex-col">
-                    <span className="text-slate-400 text-[10px] uppercase mb-0.5">{t.histStyle}</span>
-                    <span className="font-medium text-slate-700">{task.style || 'DEFAULT'}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-slate-400 text-[10px] uppercase mb-0.5">{t.histRatio}</span>
-                    <span className="font-medium text-slate-700">{task.aspectRatio || '1:1'}</span>
-                  </div>
-                  <div className="col-span-2 flex flex-col pt-1 border-t border-slate-200 mt-1">
-                    <span className="text-slate-400 text-[10px] uppercase mb-0.5">{t.histTime}</span>
-                    <span className="text-slate-600">{formatDate(task.createdAt)}</span>
-                  </div>
-                </div>
-              </div>
+    <div className="min-h-[calc(100vh-3.5rem)] bg-canvas">
+      <div className="container mx-auto py-8 px-4 lg:px-6 max-w-7xl">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-10 w-10 rounded-xl bg-brand/10 flex items-center justify-center">
+              <Clock className="h-5 w-5 text-brand" />
             </div>
-          ))}
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {t.histTitle}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {t.histSubtitle}
+              </p>
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-32">
+            <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+              <Loader2 className="h-7 w-7 animate-spin text-brand" />
+            </div>
+            <p className="text-sm text-muted-foreground font-medium">
+              {t.histLoading}
+            </p>
+          </div>
+        ) : error ? (
+          /* Error State */
+          <div className="flex flex-col items-center justify-center py-32">
+            <div className="h-16 w-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+              <AlertCircle className="h-7 w-7 text-destructive" />
+            </div>
+            <h3 className="text-lg font-semibold mb-1">{t.histErrorTitle}</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-md text-center">
+              {error.includes("401") || error.includes("Unauthorized")
+                ? t.histUnauthorizedDesc
+                : t.histErrorDesc}
+            </p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={loadHistory}>
+                <RefreshCw className="h-4 w-4 mr-1.5" />
+                {t.errorRetry}
+              </Button>
+              <Button render={<Link href="/" />}>
+                <ArrowRight className="h-4 w-4 mr-1.5" />
+                {t.histBackToWork}
+              </Button>
+            </div>
+          </div>
+        ) : tasks.length === 0 ? (
+          /* Empty State */
+          <div className="flex flex-col items-center justify-center py-32">
+            <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-brand/10 to-purple/10 flex items-center justify-center mb-6 border border-brand/10">
+              <ImageIcon className="h-8 w-8 text-brand" />
+            </div>
+            <h3 className="text-lg font-semibold mb-1">{t.histEmpty}</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-sm text-center">
+              {t.histEmptyDesc}
+            </p>
+            <Button render={<Link href="/" />}>
+              <Sparkles className="h-4 w-4 mr-1.5" />
+              {t.histGoCreate}
+            </Button>
+          </div>
+        ) : (
+          /* Task Grid */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5">
+            {tasks.map((task) => {
+              const statusConfig = getStatusConfig(task.status);
+              return (
+                <div
+                  key={task.id}
+                  className="bg-white rounded-xl border border-border overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 group"
+                >
+                  {/* Image area */}
+                  <div className="aspect-square relative bg-muted/30 flex items-center justify-center">
+                    {task.status === "success" && task.imageUrl ? (
+                      <>
+                        <Image
+                          src={task.imageUrl}
+                          alt={task.prompt}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                          <a
+                            href={task.imageUrl}
+                            target="_blank"
+                            download
+                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-foreground shadow-lg hover:scale-105 transition-transform duration-200"
+                          >
+                            <Download className="h-5 w-5" />
+                          </a>
+                        </div>
+                      </>
+                    ) : task.status === "failed" ? (
+                      <div className="flex flex-col items-center p-4 text-center">
+                        <div className="h-12 w-12 rounded-xl bg-destructive/10 flex items-center justify-center mb-2">
+                          <AlertCircle className="h-6 w-6 text-destructive" />
+                        </div>
+                        <span className="text-xs text-muted-foreground max-w-[180px]">
+                          {task.errorReason || t.histFailed}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <div className="h-12 w-12 rounded-xl bg-brand/10 flex items-center justify-center mb-2">
+                          <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {t.histPending}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Status Badge */}
+                    <div
+                      className={`absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium backdrop-blur-md ${statusConfig.bg} ${statusConfig.text_color} ${statusConfig.border} border`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`}
+                      />
+                      {statusConfig.text}
+                    </div>
+                  </div>
+
+                  {/* Info area */}
+                  <div className="p-4">
+                    <p
+                      className="text-sm font-medium text-foreground line-clamp-2 mb-3 leading-snug"
+                      title={task.prompt}
+                    >
+                      {task.prompt}
+                    </p>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {task.style && (
+                        <span className="px-2 py-0.5 rounded-md bg-muted/50 text-[10px] font-medium text-muted-foreground border border-border/50">
+                          {task.style}
+                        </span>
+                      )}
+                      {task.aspectRatio && (
+                        <span className="px-2 py-0.5 rounded-md bg-muted/50 text-[10px] font-medium text-muted-foreground border border-border/50">
+                          {task.aspectRatio}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-muted-foreground ml-auto">
+                        {formatDate(task.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
