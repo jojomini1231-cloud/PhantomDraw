@@ -2,7 +2,6 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { randomUUID } from 'crypto';
 import { ApiKey } from './entities/api-key.entity';
 
 @Injectable()
@@ -12,13 +11,6 @@ export class AuthService {
     private apiKeyRepository: Repository<ApiKey>,
     private jwtService: JwtService,
   ) {}
-
-  async generateKey(): Promise<ApiKey> {
-    const key = new ApiKey();
-    key.key = 'pd_' + randomUUID().replace(/-/g, '');
-    key.quota = 100;
-    return this.apiKeyRepository.save(key);
-  }
 
   async login(keyString: string) {
     const apiKey = await this.apiKeyRepository.findOne({ where: { key: keyString } });
@@ -34,6 +26,7 @@ export class AuthService {
       accessToken: this.jwtService.sign(payload),
       refreshToken: this.jwtService.sign(payload, { expiresIn: '30d' }),
       quota: apiKey.quota,
+      multiplier: apiKey.multiplier ?? 10,
     };
   }
 

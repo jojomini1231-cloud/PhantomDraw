@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, ForbiddenException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
@@ -7,7 +7,7 @@ export class AuthController {
 
   @Post('generate-key')
   async generateKey() {
-    return this.authService.generateKey();
+    throw new ForbiddenException('公开申请 API Key 已关闭，请联系管理员发放');
   }
 
   @Post('login')

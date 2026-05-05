@@ -1,33 +1,56 @@
-import { Injectable, UnauthorizedException, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { AdminUser } from './entities/admin-user.entity';
 import { AuditLog } from './entities/audit-log.entity';
 
 @Injectable()
 export class AdminService implements OnModuleInit {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     @InjectRepository(AdminUser)
     private adminUserRepository: Repository<AdminUser>,
     @InjectRepository(AuditLog)
     private auditLogRepository: Repository<AuditLog>,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async onModuleInit() {
-    // Automatically create a superadmin if no admin exists
     const count = await this.adminUserRepository.count();
-    if (count === 0) {
-      const passwordHash = await bcrypt.hash('admin123', 10);
-      await this.adminUserRepository.save({
-        username: 'admin',
-        passwordHash,
-        role: 'superadmin',
-      });
-      console.log('Created default superadmin: admin / admin123');
+    if (count > 0) {
+      return;
     }
+
+    const bootstrapUsername = this.configService.get<string>('BOOTSTRAP_ADMIN_USERNAME')?.trim();
+    const bootstrapPassword = this.configService.get<string>('BOOTSTRAP_ADMIN_PASSWORD');
+
+    if (!bootstrapUsername || !bootstrapPassword) {
+      this.logger.warn(
+        'No admin user exists. Set BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD to create the first superadmin explicitly.',
+      );
+      return;
+    }
+
+    if (bootstrapPassword.length < 12) {
+      this.logger.error('BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters long.');
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(bootstrapPassword, 10);
+    await this.adminUserRepository.save({
+      username: bootstrapUsername,
+      passwordHash,
+      role: 'superadmin',
+    });
+
+    this.logger.warn(
+      `Bootstrapped initial superadmin "${bootstrapUsername}". Remove BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD after first startup.`,
+    );
   }
 
   async login(username: string, pass: string) {
