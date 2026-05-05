@@ -84,7 +84,7 @@ export default function WorkspacePage() {
 function WorkspacePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { token, quota, updateQuota } = useAuthStore();
+  const { token, quota, multiplier, updateQuota } = useAuthStore();
   const { language } = useLangStore();
   const t = translations[language];
   const [mounted, setMounted] = useState(false);
@@ -145,7 +145,7 @@ function WorkspacePageContent() {
     : language === "zh"
       ? "文生图"
       : "Text to image";
-  const generationQuotaCost = generationMode === "agent" ? 0 : 1;
+  const generationQuotaCost = generationMode === "agent" ? 0 : Math.max(1, multiplier ?? 10);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setMounted(true));

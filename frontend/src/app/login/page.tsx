@@ -40,7 +40,8 @@ export default function LoginPage() {
   const t = translations[language];
 
   useEffect(() => {
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => setMounted(true));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
@@ -59,11 +60,11 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ apiKey }),
       });
-      setAuth(data.accessToken, apiKey, data.quota);
+      setAuth(data.accessToken, apiKey, data.quota, data.multiplier);
       toast.success(t.loginSuccess);
       router.push("/");
-    } catch (err: any) {
-      toast.error(err.message || t.loginFailed);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t.loginFailed);
     } finally {
       setLoading(false);
     }
