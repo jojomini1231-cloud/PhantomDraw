@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
+import { randomUUID } from 'crypto';
+import { Repository } from 'typeorm';
 import { AppModule } from './../src/app.module';
+import { ApiKey } from './../src/auth/entities/api-key.entity';
 import { io, Socket } from 'socket.io-client';
 
 describe('Generate flow (e2e)', () => {
@@ -10,6 +14,7 @@ describe('Generate flow (e2e)', () => {
   let authToken: string;
   let apiKey: string;
   let serverPort: number;
+  let apiKeyRepository: Repository<ApiKey>;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -18,6 +23,7 @@ describe('Generate flow (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
+    apiKeyRepository = app.get<Repository<ApiKey>>(getRepositoryToken(ApiKey));
     
     // We need to listen to a real port for WebSocket to work
     await app.listen(0);
@@ -32,12 +38,23 @@ describe('Generate flow (e2e)', () => {
     await app.close();
   });
 
-  it('should authenticate, generate image and receive websocket progress', async () => {
-    // 1. Generate API Key
-    const keyRes = await request(app.getHttpServer())
+  it('should reject public API key self-service signup', async () => {
+    await request(app.getHttpServer())
       .post('/auth/generate-key')
-      .expect(201);
-    apiKey = keyRes.body.key;
+      .expect(403);
+  });
+
+  it('should authenticate, generate image and receive websocket progress', async () => {
+    // 1. Seed a test API Key internally instead of relying on the public signup endpoint.
+    apiKey = `pd_${randomUUID().replace(/-/g, '')}`;
+    await apiKeyRepository.save(
+      apiKeyRepository.create({
+        key: apiKey,
+        quota: 100,
+        multiplier: 10,
+        isActive: true,
+      }),
+    );
     expect(apiKey).toBeDefined();
 
     // 2. Login to get JWT Token
