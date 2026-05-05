@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { ApiKey } from '../auth/entities/api-key.entity';
 
@@ -10,6 +10,27 @@ export class ApiKeyManagementService {
     @InjectRepository(ApiKey)
     private apiKeyRepository: Repository<ApiKey>,
   ) {}
+
+  private normalizeQuota(quota: number) {
+    const normalizedQuota = Number(quota);
+    if (!Number.isFinite(normalizedQuota) || normalizedQuota < 0) {
+      throw new BadRequestException('额度必须大于或等于 0');
+    }
+    return Math.floor(normalizedQuota);
+  }
+
+  private normalizeMultiplier(multiplier: number) {
+    const normalizedMultiplier = Number(multiplier);
+    if (!Number.isFinite(normalizedMultiplier) || normalizedMultiplier < 1) {
+      throw new BadRequestException('倍率必须大于或等于 1');
+    }
+    return Math.floor(normalizedMultiplier);
+  }
+
+  private withDefaultMultiplier<T extends ApiKey>(item: T): T {
+    item.multiplier = item.multiplier ?? 10;
+    return item;
+  }
 
   async findAll(page: number = 1, limit: number = 10, search?: string) {
     const query = this.apiKeyRepository.createQueryBuilder('apiKey');
@@ -26,7 +47,7 @@ export class ApiKeyManagementService {
       .getManyAndCount();
 
     return {
-      items,
+      items: items.map((item) => this.withDefaultMultiplier(item)),
       total,
       page,
       limit,
@@ -34,21 +55,66 @@ export class ApiKeyManagementService {
     };
   }
 
-  async createKey(quota: number = 100) {
+  async createKey(quota: number = 100, multiplier: number = 10) {
     const key = new ApiKey();
     key.key = 'pd_' + randomUUID().replace(/-/g, '');
-    key.quota = quota;
+    key.quota = this.normalizeQuota(quota);
+    key.multiplier = this.normalizeMultiplier(multiplier);
     key.isActive = true;
     return this.apiKeyRepository.save(key);
   }
 
   async updateQuota(id: string, newQuota: number) {
+    return this.updateKey(id, { quota: newQuota });
+  }
+
+  async updateKey(id: string, updates: { quota?: number; multiplier?: number }) {
     const key = await this.apiKeyRepository.findOne({ where: { id } });
     if (!key) {
       throw new NotFoundException('密钥不存在');
     }
-    key.quota = newQuota;
+
+    if (updates.quota !== undefined) {
+      key.quota = this.normalizeQuota(updates.quota);
+    }
+
+    if (updates.multiplier !== undefined) {
+      key.multiplier = this.normalizeMultiplier(updates.multiplier);
+    }
+
     return this.apiKeyRepository.save(key);
+  }
+
+  async updateMultiplier(id: string, multiplier: number) {
+    return this.updateKey(id, { multiplier });
+  }
+
+  async batchUpdateMultiplier(ids: string[], multiplier: number) {
+    const normalizedIds = [...new Set((ids || []).filter(Boolean))];
+    if (normalizedIds.length === 0) {
+      throw new BadRequestException('请先选择要修改的密钥');
+    }
+
+    const result = await this.apiKeyRepository.update(
+      { id: In(normalizedIds) },
+      { multiplier: this.normalizeMultiplier(multiplier) },
+    );
+
+    if (!result.affected) {
+      throw new NotFoundException('未找到可更新的密钥');
+    }
+
+    return { success: true, affected: result.affected };
+  }
+
+  async updateAllMultiplier(multiplier: number) {
+    const result = await this.apiKeyRepository
+      .createQueryBuilder()
+      .update(ApiKey)
+      .set({ multiplier: this.normalizeMultiplier(multiplier) })
+      .execute();
+
+    return { success: true, affected: result.affected ?? 0 };
   }
 
   async toggleStatus(id: string, isActive: boolean) {
@@ -69,6 +135,7 @@ export class ApiKeyManagementService {
   }
 
   async getAllForExport() {
-    return this.apiKeyRepository.find({ order: { createdAt: 'DESC' } });
+    const items = await this.apiKeyRepository.find({ order: { createdAt: 'DESC' } });
+    return items.map((item) => this.withDefaultMultiplier(item));
   }
 }

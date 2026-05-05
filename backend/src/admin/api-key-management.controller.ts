@@ -27,8 +27,11 @@ export class ApiKeyManagementController {
   }
 
   @Post()
-  async createKey(@Body('quota') quota?: number) {
-    return this.apiKeyService.createKey(quota);
+  async createKey(
+    @Body('quota') quota?: number,
+    @Body('multiplier') multiplier?: number,
+  ) {
+    return this.apiKeyService.createKey(quota, multiplier);
   }
 
   @Put(':id/quota')
@@ -37,6 +40,36 @@ export class ApiKeyManagementController {
     @Body('quota') quota: number,
   ) {
     return this.apiKeyService.updateQuota(id, quota);
+  }
+
+  @Put(':id')
+  async updateKey(
+    @Param('id') id: string,
+    @Body('quota') quota?: number,
+    @Body('multiplier') multiplier?: number,
+  ) {
+    return this.apiKeyService.updateKey(id, { quota, multiplier });
+  }
+
+  @Put(':id/multiplier')
+  async updateMultiplier(
+    @Param('id') id: string,
+    @Body('multiplier') multiplier: number,
+  ) {
+    return this.apiKeyService.updateMultiplier(id, multiplier);
+  }
+
+  @Put('batch/multiplier')
+  async batchUpdateMultiplier(
+    @Body('ids') ids: string[],
+    @Body('multiplier') multiplier: number,
+  ) {
+    return this.apiKeyService.batchUpdateMultiplier(ids, multiplier);
+  }
+
+  @Put('global/multiplier')
+  async updateAllMultiplier(@Body('multiplier') multiplier: number) {
+    return this.apiKeyService.updateAllMultiplier(multiplier);
   }
 
   @Put(':id/status')

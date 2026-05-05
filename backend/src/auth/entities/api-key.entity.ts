@@ -8,8 +8,11 @@ export class ApiKey {
   @Column({ unique: true })
   key: string;
 
-  @Column({ default: 100 })
+  @Column({ default: 0 })
   quota: number;
+
+  @Column({ default: 10 })
+  multiplier: number;
 
   @Column({ default: true })
   isActive: boolean;
