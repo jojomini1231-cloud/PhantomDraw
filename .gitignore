@@ -58,3 +58,6 @@ database.sqlite
 
 # Generated reports
 RISK_REVIEW_REPORT.md
+
+# LibreOffice lock files
+.~lock.*
