@@ -1,6 +1,11 @@
 FROM node:18-alpine
 
 WORKDIR /app
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
+# Used by docker-compose healthcheck.
+RUN apk add --no-cache curl
 
 COPY package*.json ./
 RUN npm ci

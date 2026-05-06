@@ -1,0 +1,32 @@
+groups:
+  - name: phantomdraw.rules
+    rules:
+      - alert: PhantomDrawBackendDown
+        expr: up{job="phantomdraw-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: PhantomDraw backend is unreachable
+          description: Backend metrics endpoint has been unreachable for more than 2 minutes.
+
+      - alert: PhantomDrawFrontendDown
+        expr: up{job="phantomdraw-frontend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: frontend
+        annotations:
+          summary: PhantomDraw frontend is unreachable
+          description: Frontend health target has been unreachable for more than 2 minutes.
+
+      - alert: PhantomDrawHighMemory
+        expr: avg_over_time(phantomdraw_process_resident_memory_bytes[5m]) > 5e8
+        for: 10m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: PhantomDraw backend memory usage is high
+          description: Backend resident memory has exceeded 500MB for at least 10 minutes.
