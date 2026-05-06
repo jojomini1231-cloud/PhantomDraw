@@ -10,14 +10,17 @@ import { AuthModule } from './auth/auth.module';
 import { GenerateModule } from './generate/generate.module';
 import { AdminModule } from './admin/admin.module';
 import { GalleryModule } from './gallery/gallery.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 100,
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -42,6 +45,7 @@ import { GalleryModule } from './gallery/gallery.module';
     GenerateModule,
     AdminModule,
     GalleryModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
