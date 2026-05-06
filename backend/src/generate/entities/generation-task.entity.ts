@@ -31,6 +31,9 @@ export class GenerationTask {
   imageUrl: string;
 
   @Column({ nullable: true })
+  storageKey: string;
+
+  @Column({ nullable: true })
   errorReason: string;
 
   @Column({ nullable: true })

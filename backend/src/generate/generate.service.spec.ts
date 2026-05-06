@@ -5,6 +5,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { GenerateService } from './generate.service';
 import { GenerationTask } from './entities/generation-task.entity';
 import { ApiKey } from '../auth/entities/api-key.entity';
+import { ObjectStorageService } from './object-storage.service';
 
 describe('GenerateService', () => {
   let service: GenerateService;
@@ -38,6 +39,12 @@ describe('GenerateService', () => {
         {
           provide: getQueueToken('image-generation'),
           useValue: imageQueue,
+        },
+        {
+          provide: ObjectStorageService,
+          useValue: {
+            getStoredImage: jest.fn(),
+          },
         },
       ],
     }).compile();

@@ -11,6 +11,7 @@ import { ApiKey } from '../auth/entities/api-key.entity';
 import { AdminModule } from '../admin/admin.module';
 import { ChatgptService } from './chatgpt.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ObjectStorageService } from './object-storage.service';
 
 @Module({
   imports: [
@@ -28,6 +29,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     }),
   ],
   controllers: [GenerateController],
-  providers: [GenerateService, GenerateProcessor, GenerateGateway, ChatgptService],
+  providers: [
+    GenerateService,
+    GenerateProcessor,
+    GenerateGateway,
+    ChatgptService,
+    ObjectStorageService,
+  ],
 })
 export class GenerateModule {}

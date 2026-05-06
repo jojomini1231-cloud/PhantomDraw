@@ -11,6 +11,7 @@ import { Queue } from 'bullmq';
 import { GenerationTask } from './entities/generation-task.entity';
 import { ApiKey } from '../auth/entities/api-key.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { ObjectStorageService } from './object-storage.service';
 
 @Injectable()
 export class GenerateService {
@@ -20,6 +21,7 @@ export class GenerateService {
     @InjectRepository(ApiKey)
     private apiKeyRepository: Repository<ApiKey>,
     @InjectQueue('image-generation') private imageQueue: Queue,
+    private objectStorageService: ObjectStorageService,
   ) {}
 
   async createTask(user: ApiKey, dto: CreateTaskDto) {
@@ -57,11 +59,17 @@ export class GenerateService {
       remainingQuota = latestUser.quota;
     });
 
+    if (!task) {
+      throw new ServiceUnavailableException('Task creation failed, please retry');
+    }
+
+    const createdTask = task as GenerationTask;
+
     try {
       const job = await this.imageQueue.add(
         'generate',
-        { taskId: task.id },
-        { jobId: task.id },
+        { taskId: createdTask.id },
+        { jobId: createdTask.id },
       );
       console.log('Job added to queue:', job.id);
     } catch (error) {
@@ -73,15 +81,15 @@ export class GenerateService {
           multiplier,
         );
 
-        if (task?.id) {
-          await transactionalEntityManager.delete(GenerationTask, { id: task.id });
+        if (createdTask.id) {
+          await transactionalEntityManager.delete(GenerationTask, { id: createdTask.id });
         }
       });
 
       throw new ServiceUnavailableException('Task queue unavailable, please retry');
     }
 
-    return { taskId: task.id, status: task.status, remainingQuota };
+    return { taskId: createdTask.id, status: createdTask.status, remainingQuota };
   }
 
   async getTaskStatus(taskId: string, user: ApiKey) {
@@ -122,5 +130,18 @@ export class GenerateService {
       hasMore: skip + items.length < total,
       nextOffset: skip + items.length,
     };
+  }
+
+  async getTaskAsset(taskId: string) {
+    const task = await this.taskRepository.findOne({
+      where: { id: taskId },
+      select: ['id', 'storageKey'],
+    });
+
+    if (!task?.storageKey) {
+      throw new NotFoundException('Stored image not found');
+    }
+
+    return this.objectStorageService.getStoredImage(task.storageKey);
   }
 }

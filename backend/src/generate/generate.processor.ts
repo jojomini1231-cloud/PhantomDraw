@@ -8,6 +8,7 @@ import { ChatgptService } from './chatgpt.service';
 import { AccountPoolService } from '../admin/account-pool.service';
 import { ProviderManagementService } from '../admin/provider-management.service';
 import { Provider } from '../admin/entities/provider.entity';
+import { ObjectStorageService } from './object-storage.service';
 
 @Processor('image-generation')
 export class GenerateProcessor extends WorkerHost {
@@ -20,6 +21,7 @@ export class GenerateProcessor extends WorkerHost {
     private chatgptService: ChatgptService,
     private accountPoolService: AccountPoolService,
     private providerManagementService: ProviderManagementService,
+    private objectStorageService: ObjectStorageService,
   ) {
     super();
   }
@@ -62,9 +64,15 @@ export class GenerateProcessor extends WorkerHost {
           }
 
           this.currentProviderIndex = (providerIndex + 1) % totalProviders;
-          
+
+          const storedImage = await this.objectStorageService.storeGeneratedImage(
+            task.id,
+            imageUrl,
+          );
+
           task.status = 'success';
-          task.imageUrl = imageUrl;
+          task.imageUrl = storedImage.imageUrl;
+          task.storageKey = storedImage.storageKey;
           task.providerName = provider.name;
           await this.taskRepository.save(task);
           this.gateway.sendTaskUpdate(task.apiKey.key, task);
@@ -108,8 +116,14 @@ export class GenerateProcessor extends WorkerHost {
       // Deduct quota
       await this.accountPoolService.decrementQuota(account.id);
 
+      const storedImage = await this.objectStorageService.storeGeneratedImage(
+        task.id,
+        imageUrl,
+      );
+
       task.status = 'success';
-      task.imageUrl = imageUrl;
+      task.imageUrl = storedImage.imageUrl;
+      task.storageKey = storedImage.storageKey;
       task.providerName = 'ChatGPT Pool';
       await this.taskRepository.save(task);
       this.gateway.sendTaskUpdate(task.apiKey.key, task);
