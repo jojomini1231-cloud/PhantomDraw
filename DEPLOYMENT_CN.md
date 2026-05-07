@@ -1,393 +1,353 @@
-# PhantomDraw - 部署指南
+# PhantomDraw 部署指南
 
-## 目录
+本文档基于当前仓库实际结构编写，覆盖本地开发、`docker compose` 启动、监控组件、版本化发布与回滚。
 
-- [环境要求](#环境要求)
-- [环境变量](#环境变量)
-- [本地开发](#本地开发)
-- [Docker 部署](#docker-部署)
-- [生产环境部署](#生产环境部署)
-- [CI/CD 流程](#cicd-流程)
-- [监控告警](#监控告警)
-- [版本化发布与回滚](#版本化发布与回滚)
-- [健康检查与验证](#健康检查与验证)
-- [常见问题排查](#常见问题排查)
+当前仓库可完成演示环境和受控环境部署，但若要直接公开上线，建议先补齐生产安全与发布治理项，例如强密钥、真实对象存储、告警通知、备份恢复与回滚演练。
 
----
+## 1. 项目结构
 
-## 环境要求
+- `frontend/`：Next.js 前端，开发模式默认监听 `4322`，容器内运行端口为 `3000`
+- `backend/`：NestJS 后端，开发模式默认监听 `3001`，`docker compose` 中监听 `3008`
+- `ops/monitoring/`：Prometheus、Alertmanager、Grafana 配置
+- `ops/bin/`：发布、回滚、健康检查脚本
+- `docker-compose.yml`：全栈容器化启动入口
 
-| 组件 | 版本 | 说明 |
-|------|------|------|
-| Node.js | v18+ | 前后端均需要 |
-| npm | v9+ | 随 Node.js 一起安装 |
-| Redis | 7+ | BullMQ 任务队列依赖 |
-| SQLite | (内置) | 默认数据库；生产环境建议迁移至 PostgreSQL |
-| Docker & Docker Compose | v20+ / v2 | 仅容器化部署需要 |
-| MinIO 或兼容 S3 的存储 | - | 图片存储必须 |
+## 2. 部署前准备
 
----
+### 2.1 环境要求
 
-## 环境变量
+| 组件 | 建议版本 | 说明 |
+|------|----------|------|
+| Node.js | 18+ | 前后端构建与本地运行 |
+| npm | 9+ | 包管理 |
+| Redis | 7+ | BullMQ 队列依赖 |
+| Docker Engine | 20+ | 容器化部署 |
+| Docker Compose | v2+ | 编排启动 |
+| MinIO / S3 | 任意兼容版本 | 生成图片存储，必需 |
+| AI 推理服务 | 按实际接入 | 文生图/图生图上游接口 |
 
-### 后端 (`backend/.env`)
+### 2.2 当前实现限制
 
-复制示例文件并填入实际值：
+- 后端当前固定使用 SQLite，`backend/src/app.module.ts` 中 TypeORM 类型写死为 `sqlite`
+- 仓库已提供 Redis、前后端和监控组件的容器编排
+- 生成结果会先写入 MinIO/S3，再通过后端资源路由对外访问
+- 首个超级管理员仅会在管理员表为空且显式设置引导变量时创建
+
+如果你准备部署到公网，请至少确认以下事项：
+
+1. 替换所有默认或示例密钥
+2. 使用稳定的 MinIO/S3 服务，而不是临时本地目录
+3. 为 SQLite 数据文件和对象存储建立备份策略
+4. 配置真实告警通知渠道，而不是占位 webhook
+
+## 3. 环境变量
+
+### 3.1 后端环境变量
+
+后端提供了示例文件：
 
 ```bash
 cd backend
 cp .env.example .env
 ```
 
-| 变量 | 必填 | 默认值 | 说明 |
-|------|------|--------|------|
-| `PORT` | 是 | `3001` | 后端 API 监听端口 |
-| `NODE_ENV` | 是 | `development` | `development` 或 `production` |
-| `APP_VERSION` | 否 | `dev` | 当前部署版本号，用于指标、发布和回滚追踪 |
-| `DB_TYPE` | 是 | `sqlite` | 数据库类型 |
-| `DB_DATABASE` | 是 | `database.sqlite` | SQLite 文件路径（相对于 backend 根目录） |
-| `REDIS_HOST` | 是 | `127.0.0.1` | Redis 服务器地址 |
-| `REDIS_PORT` | 是 | `6379` | Redis 服务器端口 |
-| `REDIS_PASSWORD` | 否 | - | Redis 密码（如启用了认证） |
-| `JWT_SECRET` | **是** | - | JWT 签名密钥，**生产环境必须使用强随机字符串** |
-| `JWT_EXPIRES_IN` | 否 | `7d` | JWT 过期时间 |
-| `ADMIN_JWT_SECRET` | **是** | - | 管理员 JWT 独立签名密钥 |
-| `BACKEND_PUBLIC_URL` | 否 | `http://localhost:3001` | 后端对浏览器可访问的公开地址，用于生成图片访问链接 |
-| `BOOTSTRAP_ADMIN_USERNAME` | 否 | - | 初始超级管理员用户名（仅在管理员表为空时生效） |
-| `BOOTSTRAP_ADMIN_PASSWORD` | 否 | - | 初始超级管理员密码 |
-| `S3_ENDPOINT` | 是 | `http://127.0.0.1:9000` | S3/MinIO 端点地址，支持完整 URL 或纯主机名 |
-| `S3_PORT` | 否 | `9000` | 当 `S3_ENDPOINT` 仅填写主机名时使用的端口 |
-| `S3_USE_SSL` | 否 | `false` | 是否启用 SSL 连接 |
-| `S3_ACCESS_KEY` | 是 | - | S3 访问密钥 |
-| `S3_SECRET_KEY` | 是 | - | S3 秘密密钥 |
-| `S3_BUCKET` | 是 | `phantomdraw` | S3 存储桶名称 |
-| `AI_API_URL` | 是 | `http://localhost:7860` | AI 模型服务地址（Stable Diffusion API / OpenAI 兼容接口） |
-| `AI_API_KEY` | 否 | - | AI 服务商 API 密钥（如需要） |
-| `CORS_ORIGIN` | 否 | `http://localhost:4322` | 允许的跨域来源 |
+建议至少配置以下变量：
 
-### 前端 (`frontend/.env.local`)
+| 变量 | 是否必填 | 示例 | 说明 |
+|------|----------|------|------|
+| `PORT` | 否 | `3001` | 后端监听端口 |
+| `NODE_ENV` | 是 | `production` | 运行环境 |
+| `APP_VERSION` | 否 | `2026.05.07` | 当前版本标识 |
+| `DB_DATABASE` | 是 | `database.sqlite` | SQLite 文件名或路径 |
+| `REDIS_HOST` | 是 | `127.0.0.1` / `redis` | Redis 地址 |
+| `REDIS_PORT` | 是 | `6379` | Redis 端口 |
+| `JWT_SECRET` | 是 | 随机长串 | 用户端 JWT 密钥 |
+| `ADMIN_JWT_SECRET` | 是 | 随机长串 | 管理端 JWT 密钥 |
+| `BACKEND_PUBLIC_URL` | 强烈建议 | `https://api.example.com` | 后端对外可访问地址，用于拼接图片访问链接 |
+| `BOOTSTRAP_ADMIN_USERNAME` | 首次初始化时必填 | `admin` | 首个超级管理员账号 |
+| `BOOTSTRAP_ADMIN_PASSWORD` | 首次初始化时必填 | 强密码 | 首个超级管理员密码 |
+| `S3_ENDPOINT` | 是 | `http://minio:9000` | MinIO/S3 端点 |
+| `S3_PORT` | 否 | `9000` | 当 `S3_ENDPOINT` 只写主机名时使用 |
+| `S3_USE_SSL` | 否 | `false` | 是否使用 HTTPS |
+| `S3_ACCESS_KEY` | 是 | `minioadmin` | 存储访问密钥 |
+| `S3_SECRET_KEY` | 是 | `minioadmin123` | 存储访问密码 |
+| `S3_BUCKET` | 是 | `phantomdraw` | 存储桶名 |
+| `AI_API_URL` | 是 | `http://host.docker.internal:7860` | AI 服务地址 |
+| `AI_API_KEY` | 按需 | `sk-xxx` | 上游服务认证 |
+| `CORS_ORIGIN` | 强烈建议 | `https://app.example.com` | 前端域名 |
 
-```bash
-cd frontend
-cp .env.example .env.local
+后端最小生产示例：
+
+```env
+PORT=3008
+NODE_ENV=production
+APP_VERSION=2026.05.07
+DB_DATABASE=database.sqlite
+REDIS_HOST=redis
+REDIS_PORT=6379
+JWT_SECRET=replace-with-a-long-random-string
+ADMIN_JWT_SECRET=replace-with-another-long-random-string
+BACKEND_PUBLIC_URL=https://api.example.com
+BOOTSTRAP_ADMIN_USERNAME=admin
+BOOTSTRAP_ADMIN_PASSWORD=replace-with-a-strong-password
+S3_ENDPOINT=http://minio:9000
+S3_PORT=9000
+S3_USE_SSL=false
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin123
+S3_BUCKET=phantomdraw
+AI_API_URL=http://host.docker.internal:7860
+AI_API_KEY=
+CORS_ORIGIN=https://app.example.com
 ```
 
-| 变量 | 必填 | 默认值 | 说明 |
-|------|------|--------|------|
-| `NEXT_PUBLIC_API_URL` | 是 | `http://localhost:3001/api` | 后端 API 基础地址 |
-| `NEXT_PUBLIC_WS_URL` | 是 | `ws://localhost:3001` | WebSocket 地址，用于实时任务进度推送 |
+### 3.2 前端环境变量
 
----
+前端仓库中当前没有 `frontend/.env.example`，请手动创建 `frontend/.env.local`。
 
-## 本地开发
+需要的变量只有两个：
 
-### 1. 启动 Redis
+| 变量 | 是否必填 | 示例 | 说明 |
+|------|----------|------|------|
+| `NEXT_PUBLIC_API_URL` | 是 | `http://localhost:3001/api` | 浏览器访问的后端 API 地址 |
+| `NEXT_PUBLIC_WS_URL` | 是 | `ws://localhost:3001` | 浏览器访问的 WebSocket 地址 |
 
-Redis 是 BullMQ 任务队列的必要依赖。安装并启动：
+本地开发示例：
 
-```bash
-# macOS
-brew install redis && brew services start redis
-
-# Ubuntu/Debian
-sudo apt install redis-server && sudo systemctl start redis
-
-# 或使用 Docker（无需安装）
-docker run -d --name redis -p 6379:6379 redis:7-alpine
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+NEXT_PUBLIC_WS_URL=ws://localhost:3001
 ```
 
-### 2. 启动后端
+公网部署示例：
+
+```env
+NEXT_PUBLIC_API_URL=https://api.example.com/api
+NEXT_PUBLIC_WS_URL=wss://api.example.com
+```
+
+注意：
+
+- `NEXT_PUBLIC_API_URL` 和 `NEXT_PUBLIC_WS_URL` 必须是浏览器可访问地址
+- 不要在生产环境继续使用 `docker-compose.yml` 里默认的 `http://backend:3008/api` 与 `ws://backend:3008`，那只是容器内网地址
+
+## 4. 本地开发部署
+
+### 4.1 启动 Redis
+
+任选一种方式：
+
+```bash
+# Ubuntu / Debian
+sudo apt install redis-server
+sudo systemctl start redis
+```
+
+```bash
+# 使用 Docker
+docker run -d --name phantomdraw-redis -p 6379:6379 redis:7-alpine
+```
+
+### 4.2 启动后端
 
 ```bash
 cd backend
 npm install
 cp .env.example .env
-# 编辑 .env 填入你的配置（至少需要：JWT_SECRET、S3 凭证、AI_API_URL）
-# 本地 MinIO 示例：
-# BACKEND_PUBLIC_URL=http://localhost:3001
-# S3_ENDPOINT=http://192.168.0.103:19000
-# S3_ACCESS_KEY=minioadmin
-# S3_SECRET_KEY=minioadmin123
-# S3_BUCKET=phantomdraw
+```
+
+编辑 `backend/.env`，至少补齐以下项：
+
+- `JWT_SECRET`
+- `ADMIN_JWT_SECRET`
+- `S3_ENDPOINT`
+- `S3_ACCESS_KEY`
+- `S3_SECRET_KEY`
+- `S3_BUCKET`
+- `AI_API_URL`
+
+然后启动：
+
+```bash
 npm run start:dev
 ```
 
-API 服务地址：`http://localhost:3001`。`start:dev` 使用 NestJS 监听模式，代码修改后自动重载。
+默认访问地址：
 
-### 3. 启动前端
+- API：`http://localhost:3001/api`
+- 健康检查：`http://localhost:3001/api/health/live`
+
+### 4.3 启动前端
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local
+cat > .env.local <<'EOF'
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+NEXT_PUBLIC_WS_URL=ws://localhost:3001
+EOF
 npm run dev
 ```
 
-前端开发服务器地址：`http://localhost:4322`。
+默认访问地址：
 
-### 4. 创建首个管理员账号
+- 前端：`http://localhost:4322`
+- 管理端：`http://localhost:4322/admin`
 
-首次运行时数据库为空，在 `backend/.env` 中设置 `BOOTSTRAP_ADMIN_USERNAME` 和 `BOOTSTRAP_ADMIN_PASSWORD`。后端会在启动时自动创建初始超级管理员。**首次登录成功后请删除这两个变量。**
+### 4.4 初始化首个管理员
 
----
-
-## Docker 部署
-
-项目根目录的 `docker-compose.yml` 提供了一键部署全栈服务的能力。
-
-### 服务列表
-
-| 服务 | 镜像 | 端口 | 用途 |
-|------|------|------|------|
-| `redis` | `redis:7-alpine` | 6379 | BullMQ 任务队列 |
-| `backend` | 基于 `backend/Dockerfile` 构建 | 3008 | NestJS API + WebSocket 服务 |
-| `frontend` | 基于 `frontend/Dockerfile` 构建 | 3000 | Next.js 应用（standalone 模式） |
-| `prometheus` | `prom/prometheus` | 9090 | 指标采集与告警规则计算 |
-| `alertmanager` | `prom/alertmanager` | 9093 | 告警路由与通知聚合 |
-| `grafana` | `grafana/grafana` | 3009 | 监控看板 |
-
-### 快速启动
-
-```bash
-# 在项目根目录执行
-docker-compose up -d --build
-```
-
-启动后将：
-1. 构建后端和前端镜像
-2. 启动 Redis、后端和前端容器
-3. 创建持久化卷用于 Redis 数据和 SQLite 数据库
-
-访问地址：`http://localhost:3000`
-
-### 自定义环境变量
-
-`docker-compose.yml` 中包含内联环境变量，适用于本地开发。生产环境建议覆盖：
-
-**方式 A：在项目根目录创建 `.env` 文件**（docker-compose 会自动读取）：
+首次启动且管理员表为空时，在 `backend/.env` 中设置：
 
 ```env
-JWT_SECRET=你的生产环境JWT密钥
-ADMIN_JWT_SECRET=你的生产环境管理员密钥
-S3_ACCESS_KEY=你的S3访问密钥
-S3_SECRET_KEY=你的S3秘密密钥
-AI_API_URL=https://你的AI服务商地址
-AI_API_KEY=你的AI密钥
-CORS_ORIGIN=https://你的域名
+BOOTSTRAP_ADMIN_USERNAME=admin
+BOOTSTRAP_ADMIN_PASSWORD=your-strong-password
 ```
 
-然后在 `docker-compose.yml` 中引用：
+后端启动后会自动创建首个超级管理员。首次登录成功后，请立刻删除这两个变量并重启后端。
 
-```yaml
-backend:
-  environment:
-    - JWT_SECRET=${JWT_SECRET}
-```
+## 5. Docker Compose 部署
 
-**方式 B：使用 `env_file` 指令**：
+### 5.1 编排内容
 
-```yaml
-backend:
-  env_file:
-    - ./backend/.env
-```
+根目录 `docker-compose.yml` 默认会启动以下服务：
 
-### 持久化数据
+| 服务 | 对外端口 | 说明 |
+|------|----------|------|
+| `redis` | `6379` | BullMQ 队列 |
+| `backend` | `3008` | NestJS API 与 WebSocket |
+| `frontend` | `3000` | Next.js standalone 服务 |
+| `prometheus` | `9090` | 指标采集 |
+| `alertmanager` | `9093` | 告警路由 |
+| `grafana` | `3009` | 可视化看板 |
 
-| 卷名 | 容器 | 路径 | 用途 |
-|------|------|------|------|
-| `redis_data` | redis | `/data` | Redis 数据持久化 |
-| `backend_data` | backend | `/app/data` | SQLite 数据库文件 |
+### 5.2 直接启动
 
-清除所有数据：
+在项目根目录执行：
 
 ```bash
-docker-compose down -v
+docker compose up -d --build
 ```
 
-### 常用命令
+默认访问地址：
 
-```bash
-# 查看日志
-docker-compose logs -f backend
-docker-compose logs -f frontend
-docker-compose logs -f prometheus
-
-# 重新构建单个服务
-docker-compose up -d --build backend
-
-# 停止所有服务
-docker-compose down
-
-# 停止并删除卷（会丢失数据）
-docker-compose down -v
-```
-
----
-
-## 生产环境部署
-
-### 架构概览
-
-```
-                    ┌─────────────┐
-                    │   CDN/WAF   │
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │  负载均衡    │
-                    └──┬───────┬──┘
-                       │       │
-              ┌────────▼─┐  ┌──▼────────┐
-              │  前端     │  │   后端     │
-              │ (Next.js) │  │  (NestJS) │
-              │ Vercel /  │  │  ECS / K8s│
-              │ Amplify   │  │           │
-              └───────────┘  └──┬────┬───┘
-                                │    │
-                    ┌───────────▼┐  ┌▼──────────┐
-                    │ PostgreSQL │  │   Redis    │
-                    │  (RDS /    │  │ (Elasti-   │
-                    │  Supabase) │  │  Cache)    │
-                    └────────────┘  └────────────┘
-```
-
-### 前端 (Next.js)
-
-**推荐方案**：Vercel 或 AWS Amplify，自动提供边缘缓存和全球 CDN。
-
-- Dockerfile 使用 Next.js **standalone 输出模式**，镜像体积最小化。
-- 自托管时，确保 `NEXT_PUBLIC_API_URL` 和 `NEXT_PUBLIC_WS_URL` 指向公网可访问的后端域名（而非 Docker 内部地址）。
-
-### 后端 (NestJS + BullMQ)
-
-**推荐方案**：AWS ECS (Fargate)、Google Cloud Run 或 Kubernetes。
-
-关键要点：
-
-- **分离 API 和 Worker 进程**：`GenerateProcessor` 处理 CPU/GPU 密集型图片生成任务。高流量场景下，应部署专用的 Worker 实例，仅运行 BullMQ Worker，与 API/WebSocket 服务器分离。
-- **WebSocket 支持**：确保负载均衡器支持 WebSocket 连接（需要 sticky sessions 或 WebSocket 感知路由）。
-- **CORS**：生产环境中将 `CORS_ORIGIN` 设置为前端域名。
-- **安全**：将 `JWT_SECRET` 和 `ADMIN_JWT_SECRET` 更换为强随机字符串，切勿使用默认值。
-
-### 数据库迁移（SQLite → PostgreSQL）
-
-生产环境建议迁移至 PostgreSQL 以支持并发写入：
-
-1. 安装 PostgreSQL 驱动：
-   ```bash
-   cd backend && npm install pg
-   ```
-2. 更新 `backend/.env`：
-   ```env
-   DB_TYPE=postgres
-   DB_HOST=your-rds-endpoint.amazonaws.com
-   DB_PORT=5432
-   DB_USERNAME=phantomdraw
-   DB_PASSWORD=你的数据库密码
-   DB_DATABASE=phantomdraw
-   ```
-3. TypeORM 会在开发模式下自动同步 Schema。生产环境请生成并执行迁移：
-   ```bash
-   npm run typeorm migration:generate -- -n InitSchema
-   npm run typeorm migration:run
-   ```
-
-### 对象存储 (S3/MinIO)
-
-- 生产环境使用 **AWS S3** 或 **Cloudflare R2** 存储生成的图片。
-- 在 S3 前置 CDN（CloudFront、Cloudflare）加速图片加载。
-- 如前端直接上传，需在 S3 存储桶上配置 CORS。
-
-### AI 图片生成服务
-
-连接生产级推理服务：
-
-| 服务商 | 适用场景 |
-|--------|----------|
-| Replicate API | 托管服务，按需付费，模型选择丰富 |
-| RunPod | GPU 云服务，适合自定义 ComfyUI/A1111 |
-| OpenAI DALL-E 3 API | 接口简单，生成质量高 |
-| 自建服务 (EC2 g4dn/g5) | 完全自主可控，成本和复杂度最高 |
-
-根据实际情况设置 `AI_API_URL` 和 `AI_API_KEY`。
-
-### HTTPS 与域名配置
-
-- 使用反向代理（Nginx、Caddy 或云负载均衡器）处理 TLS 终止。
-- Caddy 配置示例（自动 HTTPS）：
-  ```
-  yourdomain.com {
-      reverse_proxy frontend:3000
-  }
-
-  api.yourdomain.com {
-      reverse_proxy backend:3008
-  }
-  ```
-
----
-
-## CI/CD 流程
-
-仓库新增 GitHub Actions 工作流：`.github/workflows/ci-cd.yml`。
-
-### 默认流水线阶段
-
-1. 后端 `npm ci`
-2. 后端 `lint`、单测、E2E、`build`
-3. 前端 `npm ci`
-4. 前端 `lint`、`build`
-5. Docker 镜像构建校验
-6. `main` / `master` 分支 push 时生成发布归档物
-
-### 接入建议
-
-- PR 阶段将工作流状态设为必过检查。
-- 主干分支仅允许通过 CI 校验的提交进入部署流程。
-- 生产环境将 `APP_VERSION` 统一设置为 Git SHA、语义化版本或制品标签。
-
----
-
-## 监控告警
-
-### 目录结构
-
-项目新增 `ops/monitoring/`：
-
-- `prometheus/prometheus.yml`：抓取后端 `api/metrics`
-- `prometheus/alerts.yml`：内置后端不可达、前端不可达、后端高内存告警
-- `alertmanager.yml`：统一告警路由
-- `grafana/`：预置 Prometheus 数据源与 `PhantomDraw Overview` 看板
-
-### 启动方式
-
-```bash
-docker-compose up -d prometheus alertmanager grafana
-```
-
-### 访问地址
-
+- 前端：`http://localhost:3000`
+- 后端：`http://localhost:3008/api`
 - Prometheus：`http://localhost:9090`
 - Alertmanager：`http://localhost:9093`
 - Grafana：`http://localhost:3009`
 
-### 告警说明
+### 5.3 启动前必须改的内容
 
-- 默认 `alertmanager.yml` 使用 webhook 占位地址，生产环境请替换为真实通知入口。
-- 建议在现有规则基础上继续补充 Redis 延迟、BullMQ 队列堆积、生成失败率等业务告警。
+当前 `docker-compose.yml` 内含演示性质的默认值，至少需要覆盖以下配置：
 
----
+- `JWT_SECRET`
+- `ADMIN_JWT_SECRET`
+- `S3_ACCESS_KEY`
+- `S3_SECRET_KEY`
+- `AI_API_URL`
+- `AI_API_KEY`
+- `CORS_ORIGIN`
+- `NEXT_PUBLIC_API_URL`
+- `NEXT_PUBLIC_WS_URL`
 
-## 版本化发布与回滚
+推荐做法是先准备一份根目录 `.env`，供 `docker compose` 插值使用：
 
-项目新增 `ops/bin/` 标准脚本：
+```env
+APP_VERSION=2026.05.07
+JWT_SECRET=replace-with-a-long-random-string
+ADMIN_JWT_SECRET=replace-with-another-long-random-string
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin123
+AI_API_URL=http://host.docker.internal:7860
+AI_API_KEY=
+CORS_ORIGIN=https://app.example.com
+NEXT_PUBLIC_API_URL=https://api.example.com/api
+NEXT_PUBLIC_WS_URL=wss://api.example.com
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=change-this-password
+```
 
-- `deploy.sh <version>`：创建版本目录、切换 `current` 软链并重新部署
-- `rollback.sh`：回退到 `previous` 版本
-- `healthcheck.sh`：校验服务存活与就绪状态
+然后将 `docker-compose.yml` 中对应环境变量改为引用 `.env` 的值。
 
-### 推荐发布流程
+### 5.4 数据持久化
+
+当前编排中有两个命名卷：
+
+| 卷名 | 用途 |
+|------|------|
+| `redis_data` | Redis 数据持久化 |
+| `backend_data` | SQLite 数据持久化 |
+
+删除容器但保留数据：
+
+```bash
+docker compose down
+```
+
+删除容器和卷：
+
+```bash
+docker compose down -v
+```
+
+## 6. 生产环境建议
+
+### 6.1 推荐拓扑
+
+最小可用部署建议如下：
+
+1. 反向代理或负载均衡器暴露 `443`
+2. 前端容器对外提供页面
+3. 后端容器对外提供 `/api` 与 WebSocket
+4. Redis 独立部署
+5. MinIO/S3 独立部署
+6. AI 推理服务独立部署
+
+### 6.2 反向代理
+
+推荐由 Nginx 或 Caddy 统一处理 HTTPS。Caddy 示例：
+
+```caddy
+app.example.com {
+    reverse_proxy 127.0.0.1:3000
+}
+
+api.example.com {
+    reverse_proxy 127.0.0.1:3008
+}
+```
+
+如果前后端走同域不同路径，也要确保 WebSocket 升级头被正确透传。
+
+### 6.3 生产风险提示
+
+- 当前后端仍使用 SQLite，更适合单机、低并发或内部系统
+- `synchronize: true` 仍处于开启状态，生产变更前必须评估表结构风险
+- `docker-compose.yml` 中的默认密钥不能直接上线
+- 告警配置默认只有占位通知地址，需要替换成企业微信、飞书、Slack 或 webhook
+
+## 7. CI/CD 与版本发布
+
+### 7.1 GitHub Actions
+
+仓库已提供 `.github/workflows/ci-cd.yml`。建议将其作为发布前置校验，至少确保：
+
+1. 后端 `lint`
+2. 后端单元测试与 E2E
+3. 后端构建
+4. 前端 `lint`
+5. 前端构建
+6. Docker 构建校验
+
+### 7.2 版本化发布脚本
+
+仓库已提供：
+
+- `ops/bin/deploy.sh <version>`
+- `ops/bin/rollback.sh`
+- `ops/bin/healthcheck.sh`
+
+推荐发布方式：
 
 ```bash
 export APP_VERSION=$(git rev-parse --short HEAD)
@@ -395,71 +355,75 @@ bash ops/bin/deploy.sh "$APP_VERSION"
 bash ops/bin/healthcheck.sh
 ```
 
-### 回滚流程
+说明：
+
+- `deploy.sh` 会在 `ops/releases/<version>` 下创建版本目录
+- `current` 软链指向当前版本
+- 如果已有旧版本，`previous` 软链会自动记录上一版本
+
+### 7.3 回滚
 
 ```bash
 bash ops/bin/rollback.sh
 bash ops/bin/healthcheck.sh
 ```
 
-### 目录约定
+## 8. 监控与健康检查
 
-- `ops/releases/current`：当前线上版本
-- `ops/releases/previous`：上一稳定版本
-- `ops/releases/<version>`：按版本号归档的发布目录
+### 8.1 健康检查接口
 
----
+后端内置如下接口：
 
-## 健康检查与验证
+- `/api/health/live`
+- `/api/health/ready`
+- `/api/metrics`
 
-### 服务验证
-
-```bash
-# 后端存活检查
-curl http://localhost:3001/api/health/live
-
-# 后端就绪检查
-curl http://localhost:3001/api/health/ready
-
-# Prometheus 指标
-curl http://localhost:3001/api/metrics
-
-# 前端
-curl -I http://localhost:3000
-
-# Redis
-redis-cli ping  # 应返回 PONG
-
-# WebSocket（需要 wscat）
-npx wscat -c ws://localhost:3001
-```
-
-### Docker 容器状态
+本地或容器中验证：
 
 ```bash
-docker-compose ps
+curl http://localhost:3008/api/health/live
+curl http://localhost:3008/api/health/ready
+curl http://localhost:3008/api/metrics
 ```
 
-`backend`、`frontend`、`redis` 应显示 `healthy` 或 `Up` 状态。查看日志排查错误：
+如果是本地开发端口，则将 `3008` 替换为 `3001`。
+
+### 8.2 监控组件
+
+监控配置位于 `ops/monitoring/`：
+
+- `prometheus/prometheus.yml`：Prometheus 抓取配置
+- `prometheus/alerts.yml`：内置告警规则
+- `alertmanager.yml`：告警路由
+- `grafana/`：预置数据源与看板
+
+仅启动监控组件：
 
 ```bash
-docker-compose logs --tail=50 backend
-docker-compose logs --tail=50 frontend
-docker-compose logs --tail=50 prometheus
-docker-compose logs --tail=50 alertmanager
+docker compose up -d prometheus alertmanager grafana
 ```
 
----
+## 9. 验证清单
 
-## 常见问题排查
+完成部署后，按顺序检查：
 
-| 问题 | 解决方案 |
+1. `docker compose ps` 中 `backend`、`frontend`、`redis` 状态正常
+2. 前端首页可打开
+3. 管理端登录页可打开
+4. `GET /api/health/live` 返回成功
+5. `GET /api/health/ready` 返回成功
+6. Grafana 与 Prometheus 可访问
+7. 首个管理员可登录
+8. 创建一条生成任务后，任务状态能推进且图片能正常访问
+
+## 10. 常见问题
+
+| 问题 | 排查建议 |
 |------|----------|
-| 后端无法连接 Redis | 确认 Redis 已启动，检查 `REDIS_HOST`/`REDIS_PORT`。Docker 环境中主机名应为 `redis` |
-| 前端显示 API 错误 | 确认 `NEXT_PUBLIC_API_URL` 在浏览器中可访问，检查后端 CORS 配置 |
-| WebSocket 连接失败 | 确认 `NEXT_PUBLIC_WS_URL` 使用 `ws://` 协议（非 `http://`），检查负载均衡器是否支持 WebSocket 升级 |
-| SQLite 报 "database is locked" | SQLite 不适合高并发写入，生产环境请迁移至 PostgreSQL |
-| 图片生成挂起 | 检查 `AI_API_URL` 是否可从后端容器访问，通过 Redis 检查 BullMQ 队列中是否有卡住的任务 |
-| Docker 构建失败 | 执行 `docker-compose build --no-cache` 强制重新构建，先确认本地 `npm ci` 能正常运行 |
-| 管理员账号未创建 | 确保同时设置了 `BOOTSTRAP_ADMIN_USERNAME` 和 `BOOTSTRAP_ADMIN_PASSWORD`，仅在管理员表为空时生效 |
-| 前端无法加载远程图片 | 检查 `next.config.ts` 中的 `images.remotePatterns` 配置，确保包含图片域名 |
+| 前端请求报错或 404 | 检查 `NEXT_PUBLIC_API_URL` 是否为浏览器可访问地址，不要误填容器内网地址 |
+| WebSocket 连接失败 | 检查 `NEXT_PUBLIC_WS_URL` 是否使用正确协议，公网应优先使用 `wss://` |
+| 后端无法连接 Redis | Docker 环境使用 `redis` 作为主机名，宿主机环境通常使用 `127.0.0.1` |
+| 图片无法访问 | 检查 `BACKEND_PUBLIC_URL` 是否为公网地址，S3/MinIO 凭证是否正确 |
+| 管理员未自动创建 | 仅在管理员表为空时会触发，且必须同时设置 `BOOTSTRAP_ADMIN_USERNAME` 与 `BOOTSTRAP_ADMIN_PASSWORD` |
+| 生成任务一直 pending | 检查 Redis 是否正常、AI 服务是否可从后端容器访问、对象存储是否可写 |
+| 构建后前端仍指向旧地址 | Next.js 公共环境变量在构建时注入，修改后需要重新构建镜像 |
