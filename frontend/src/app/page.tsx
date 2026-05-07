@@ -63,6 +63,20 @@ interface RegeneratePayload {
   imageUrl?: string | null;
 }
 
+function resolveWsUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_WS_URL;
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${window.location.host}`;
+  }
+
+  return "ws://localhost:3008";
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
@@ -197,7 +211,7 @@ function WorkspacePageContent() {
     if (!token) {
       router.replace("/login");
     } else {
-      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3008";
+      const wsUrl = resolveWsUrl();
       socketRef.current = io(wsUrl, {
         auth: { token },
       });
