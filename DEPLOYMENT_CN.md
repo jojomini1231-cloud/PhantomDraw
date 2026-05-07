@@ -18,7 +18,7 @@
 
 | 组件 | 建议版本 | 说明 |
 |------|----------|------|
-| Node.js | 18+ | 前后端构建与本地运行 |
+| Node.js | 20+ | 前后端构建与本地运行 |
 | npm | 9+ | 包管理 |
 | Redis | 7+ | BullMQ 队列依赖 |
 | Docker Engine | 20+ | 容器化部署 |
@@ -103,7 +103,7 @@ CORS_ORIGIN=https://app.example.com
 
 ### 3.2 前端环境变量
 
-前端仓库中当前没有 `frontend/.env.example`，请手动创建 `frontend/.env.local`。
+前端已提供示例文件，请复制为 `frontend/.env.local`。
 
 需要的变量只有两个：
 
@@ -114,9 +114,9 @@ CORS_ORIGIN=https://app.example.com
 
 本地开发示例：
 
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3001/api
-NEXT_PUBLIC_WS_URL=ws://localhost:3001
+```bash
+cd frontend
+cp .env.example .env.local
 ```
 
 公网部署示例：
@@ -182,10 +182,7 @@ npm run start:dev
 ```bash
 cd frontend
 npm install
-cat > .env.local <<'EOF'
-NEXT_PUBLIC_API_URL=http://localhost:3001/api
-NEXT_PUBLIC_WS_URL=ws://localhost:3001
-EOF
+cp .env.example .env.local
 npm run dev
 ```
 
@@ -209,22 +206,23 @@ BOOTSTRAP_ADMIN_PASSWORD=your-strong-password
 
 ### 5.1 编排内容
 
-根目录 `docker-compose.yml` 默认会启动以下服务：
+根目录 `docker-compose.yml` 默认会启动以下核心服务：
 
 | 服务 | 对外端口 | 说明 |
 |------|----------|------|
 | `redis` | `6379` | BullMQ 队列 |
+| `minio` | `9000` / `9001` | 对象存储与控制台 |
 | `backend` | `3008` | NestJS API 与 WebSocket |
 | `frontend` | `3000` | Next.js standalone 服务 |
-| `prometheus` | `9090` | 指标采集 |
-| `alertmanager` | `9093` | 告警路由 |
-| `grafana` | `3009` | 可视化看板 |
+
+监控服务 `prometheus`、`alertmanager`、`grafana` 已切到 `monitoring` profile，仅在显式启用时启动。
 
 ### 5.2 直接启动
 
 在项目根目录执行：
 
 ```bash
+cp .env.example .env
 docker compose up -d --build
 ```
 
@@ -232,21 +230,25 @@ docker compose up -d --build
 
 - 前端：`http://localhost:3000`
 - 后端：`http://localhost:3008/api`
-- Prometheus：`http://localhost:9090`
-- Alertmanager：`http://localhost:9093`
-- Grafana：`http://localhost:3009`
+- MinIO API：`http://localhost:9000`
+- MinIO Console：`http://localhost:9001`
+
+如需监控组件，再执行：
+
+```bash
+docker compose --profile monitoring up -d
+```
 
 ### 5.3 启动前必须改的内容
 
-当前 `docker-compose.yml` 内含演示性质的默认值，至少需要覆盖以下配置：
+当前 `docker-compose.yml` 会从根目录 `.env` 读取覆盖项，至少需要覆盖以下配置：
 
 - `JWT_SECRET`
 - `ADMIN_JWT_SECRET`
 - `S3_ACCESS_KEY`
 - `S3_SECRET_KEY`
-- `AI_API_URL`
-- `AI_API_KEY`
 - `CORS_ORIGIN`
+- `DB_DATABASE`
 - `NEXT_PUBLIC_API_URL`
 - `NEXT_PUBLIC_WS_URL`
 
@@ -254,12 +256,11 @@ docker compose up -d --build
 
 ```env
 APP_VERSION=2026.05.07
+DB_DATABASE=/app/data/database.sqlite
 JWT_SECRET=replace-with-a-long-random-string
 ADMIN_JWT_SECRET=replace-with-another-long-random-string
 S3_ACCESS_KEY=minioadmin
 S3_SECRET_KEY=minioadmin123
-AI_API_URL=http://host.docker.internal:7860
-AI_API_KEY=
 CORS_ORIGIN=https://app.example.com
 NEXT_PUBLIC_API_URL=https://api.example.com/api
 NEXT_PUBLIC_WS_URL=wss://api.example.com
@@ -267,16 +268,17 @@ GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=change-this-password
 ```
 
-然后将 `docker-compose.yml` 中对应环境变量改为引用 `.env` 的值。
+前端镜像会在构建阶段读取 `NEXT_PUBLIC_API_URL` 与 `NEXT_PUBLIC_WS_URL`，所以修改这两个值后必须重新构建前端镜像。
 
 ### 5.4 数据持久化
 
-当前编排中有两个命名卷：
+当前编排中有三个命名卷：
 
 | 卷名 | 用途 |
 |------|------|
 | `redis_data` | Redis 数据持久化 |
 | `backend_data` | SQLite 数据持久化 |
+| `minio_data` | MinIO 对象存储数据 |
 
 删除容器但保留数据：
 
@@ -400,7 +402,7 @@ curl http://localhost:3008/api/metrics
 仅启动监控组件：
 
 ```bash
-docker compose up -d prometheus alertmanager grafana
+docker compose --profile monitoring up -d
 ```
 
 ## 9. 验证清单

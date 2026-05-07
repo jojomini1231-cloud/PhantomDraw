@@ -19,7 +19,7 @@
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| Node.js | v18+ | Required for both frontend and backend |
+| Node.js | v20+ | Required for both frontend and backend |
 | npm | v9+ | Comes with Node.js |
 | Redis | 7+ | Used by BullMQ for task queues |
 | SQLite | (built-in) | Default database; migrate to PostgreSQL for production |
@@ -135,70 +135,66 @@ On first run with an empty database, set `BOOTSTRAP_ADMIN_USERNAME` and `BOOTSTR
 
 ## Docker Deployment
 
-The `docker-compose.yml` at the project root provides a single-command deployment for the full stack.
+The `docker-compose.yml` at the project root provides a single-command deployment for the core app stack.
 
 ### Services
 
 | Service | Image | Port | Purpose |
 |---------|-------|------|---------|
 | `redis` | `redis:7-alpine` | 6379 | Task queue broker for BullMQ |
+| `minio` | `minio/minio` | 9000 / 9001 | S3-compatible object storage and console |
 | `backend` | Built from `backend/Dockerfile` | 3008 | NestJS API + WebSocket server |
 | `frontend` | Built from `frontend/Dockerfile` | 3000 | Next.js app (standalone mode) |
-| `prometheus` | `prom/prometheus` | 9090 | Metrics scraping and alert rule evaluation |
-| `alertmanager` | `prom/alertmanager` | 9093 | Alert routing and notification aggregation |
-| `grafana` | `grafana/grafana` | 3009 | Monitoring dashboards |
+
+Monitoring services (`prometheus`, `alertmanager`, and `grafana`) now live behind the `monitoring` profile and only start when explicitly requested.
 
 ### Quick Start
 
 ```bash
 # From the project root
-docker-compose up -d --build
+cp .env.example .env
+docker compose up -d --build
 ```
 
 This will:
 1. Build the backend and frontend images
-2. Start Redis, backend, and frontend containers
-3. Create persistent volumes for Redis data and the SQLite database
+2. Start Redis, MinIO, backend, and frontend containers
+3. Create persistent volumes for Redis, MinIO, and the SQLite database
 
 Access the app at `http://localhost:3000`.
+
+To start monitoring as well:
+
+```bash
+docker compose --profile monitoring up -d
+```
 
 ### Customizing Environment Variables
 
 The `docker-compose.yml` contains inline environment variables with sensible defaults for local use. For production, override them:
 
-**Option A: Create a `.env` file** at the project root (docker-compose auto-reads it):
+**Option A: Create a `.env` file** at the project root (`docker compose` auto-reads it):
 
 ```env
+DB_DATABASE=/app/data/database.sqlite
 JWT_SECRET=your-production-jwt-secret
 ADMIN_JWT_SECRET=your-production-admin-secret
+BACKEND_PUBLIC_URL=https://api.example.com
+CORS_ORIGIN=https://app.example.com
+NEXT_PUBLIC_API_URL=https://api.example.com/api
+NEXT_PUBLIC_WS_URL=wss://api.example.com
 S3_ACCESS_KEY=your-s3-key
 S3_SECRET_KEY=your-s3-secret
-AI_API_URL=https://your-ai-provider.com
-AI_API_KEY=your-ai-api-key
-CORS_ORIGIN=https://yourdomain.com
 ```
 
-Then reference them in `docker-compose.yml`:
-
-```yaml
-backend:
-  environment:
-    - JWT_SECRET=${JWT_SECRET}
-```
-
-**Option B: Use an `env_file` directive** in `docker-compose.yml`:
-
-```yaml
-backend:
-  env_file:
-    - ./backend/.env
-```
+The frontend image reads `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` during `docker compose build`, so rebuild the frontend image whenever those values change.
 
 ### Persistent Data
 
 | Volume | Container | Path | Purpose |
 |--------|-----------|------|---------|
 | `redis_data` | redis | `/data` | Redis persistence |
+| `minio_data` | minio | `/data` | Object storage persistence |
 | `backend_data` | backend | `/app/data` | SQLite database file |
 
 To reset all data:

@@ -47,7 +47,7 @@ PhantomDraw/
 
 ### 1. 环境要求
 
-- Node.js `18+`
+- Node.js `20+`
 - npm `9+`
 - Redis `7+`
 - MinIO 或任意 S3 兼容对象存储
@@ -84,15 +84,12 @@ npm run start:dev
 
 ### 3. 启动前端
 
-前端当前没有示例环境变量文件，请手动创建 `frontend/.env.local`：
+前端已提供示例环境变量文件：
 
 ```bash
 cd frontend
 npm install
-cat > .env.local <<'EOF'
-NEXT_PUBLIC_API_URL=http://localhost:3001/api
-NEXT_PUBLIC_WS_URL=ws://localhost:3001
-EOF
+cp .env.example .env.local
 npm run dev
 ```
 
@@ -114,34 +111,38 @@ BOOTSTRAP_ADMIN_PASSWORD=your-strong-password
 
 ## Docker Compose
 
-项目根目录提供 `docker-compose.yml`，可一键启动：
+项目根目录提供 `docker-compose.yml`，可一键启动核心服务：
 
 ```bash
+cp .env.example .env
 docker compose up -d --build
 ```
 
 默认会拉起以下服务：
 
 - `redis`
+- `minio`
 - `backend`
 - `frontend`
-- `prometheus`
-- `alertmanager`
-- `grafana`
 
 默认访问地址：
 
 - 前端：`http://localhost:3000`
 - 后端：`http://localhost:3008/api`
-- Prometheus：`http://localhost:9090`
-- Alertmanager：`http://localhost:9093`
-- Grafana：`http://localhost:3009`
+- MinIO API：`http://localhost:9000`
+- MinIO Console：`http://localhost:9001`
+
+如需监控组件，再执行：
+
+```bash
+docker compose --profile monitoring up -d
+```
 
 注意：
 
-- 当前 `docker-compose.yml` 中仍包含演示性质的默认值
-- 上线前必须替换 JWT、管理员密钥、对象存储凭证、AI 服务地址和前端公开地址
-- 前端环境变量必须填写浏览器可访问的公网地址，不能直接沿用容器内网地址
+- 前端 `NEXT_PUBLIC_*` 变量会在镜像构建时注入，请在 `docker compose build` 前准备好根目录 `.env`
+- `DB_DATABASE` 在容器部署时默认指向 `/app/data/database.sqlite`，可配合命名卷持久化 SQLite 数据
+- 上线前必须替换 JWT、管理员密钥、对象存储凭证和前端公开地址
 
 ## 部署与运维
 
