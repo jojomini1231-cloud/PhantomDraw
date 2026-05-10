@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Copy,
   Check,
+  Menu,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -154,54 +155,116 @@ export function Navbar() {
             </div>
           </div>
 
-          {/* Account dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-white px-2 transition-colors hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/20">
-              <div className="h-5 w-5 rounded-md bg-muted flex items-center justify-center">
-                <User className="h-3 w-3 text-muted-foreground" />
-              </div>
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-64" align="end" sideOffset={8}>
-              <DropdownMenuLabel className="font-normal px-3 py-2.5">
-                <div className="flex flex-col gap-1.5">
-                  <p className="text-sm font-semibold">{t.accountTitle}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      {t.accountKeyLabel}:
-                    </span>
-                    <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                      {maskKey(apiKey)}
-                    </code>
+          {/* Mobile: Quota + Menu */}
+          <div className="flex items-center gap-1.5 md:hidden">
+            <div className="flex h-8 items-center gap-1 rounded-md border border-border/50 bg-muted/50 px-2 text-xs font-medium text-muted-foreground">
+              <Coins className="h-3 w-3 text-brand" />
+              <span>{quota}</span>
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-md border border-border/50 bg-muted/50 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20">
+                <Menu className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" sideOffset={8}>
+                <DropdownMenuLabel className="font-normal px-3 py-2.5">
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-sm font-semibold">{t.accountTitle}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {t.accountKeyLabel}:
+                      </span>
+                      <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                        {maskKey(apiKey)}
+                      </code>
+                    </div>
                   </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={toggleLanguage}
+                  className="cursor-pointer px-3 py-2"
+                >
+                  <Globe className="mr-2 h-4 w-4" />
+                  <span>{language === "zh" ? "English" : "中文"}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleCopyKey}
+                  className="cursor-pointer px-3 py-2"
+                >
+                  {copied ? (
+                    <Check className="mr-2 h-4 w-4 text-emerald-500" />
+                  ) : (
+                    <Copy className="mr-2 h-4 w-4" />
+                  )}
+                  <span>{t.navCopyKey}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer px-3 py-2">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>{t.navPreferences}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="text-destructive cursor-pointer px-3 py-2 focus:text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>{t.navLogout}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Desktop: Account dropdown */}
+          <div className="hidden md:block">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-white px-2 transition-colors hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/20">
+                <div className="h-5 w-5 rounded-md bg-muted flex items-center justify-center">
+                  <User className="h-3 w-3 text-muted-foreground" />
                 </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={handleCopyKey}
-                className="cursor-pointer px-3 py-2"
-              >
-                {copied ? (
-                  <Check className="mr-2 h-4 w-4 text-emerald-500" />
-                ) : (
-                  <Copy className="mr-2 h-4 w-4" />
-                )}
-                <span>{t.navCopyKey}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer px-3 py-2">
-                <Settings className="mr-2 h-4 w-4" />
-                <span>{t.navPreferences}</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={handleLogout}
-                className="text-destructive cursor-pointer px-3 py-2 focus:text-destructive"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>{t.navLogout}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64" align="end" sideOffset={8}>
+                <DropdownMenuLabel className="font-normal px-3 py-2.5">
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-sm font-semibold">{t.accountTitle}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {t.accountKeyLabel}:
+                      </span>
+                      <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                        {maskKey(apiKey)}
+                      </code>
+                    </div>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleCopyKey}
+                  className="cursor-pointer px-3 py-2"
+                >
+                  {copied ? (
+                    <Check className="mr-2 h-4 w-4 text-emerald-500" />
+                  ) : (
+                    <Copy className="mr-2 h-4 w-4" />
+                  )}
+                  <span>{t.navCopyKey}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer px-3 py-2">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>{t.navPreferences}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="text-destructive cursor-pointer px-3 py-2 focus:text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>{t.navLogout}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
     </header>

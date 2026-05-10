@@ -216,6 +216,27 @@
   .safe-bottom {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Mobile touch target minimum */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent horizontal overflow on mobile */
+  .no-scrollbar-x {
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Mobile bottom sheet backdrop */
+  .sheet-backdrop {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 /* Smooth page transitions */

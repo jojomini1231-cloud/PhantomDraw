@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { ClientNavbar } from "@/components/ClientNavbar";
@@ -8,6 +8,13 @@ export const metadata: Metadata = {
   description: "Next-gen AI image generation platform - Turn imagination into visuals",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -15,17 +22,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-background text-foreground antialiased font-sans selection:bg-accent selection:text-accent-foreground">
+      <body className="min-h-dvh bg-background text-foreground antialiased font-sans selection:bg-accent selection:text-accent-foreground overflow-x-hidden">
         <ClientNavbar />
         <main className="flex-1">{children}</main>
         <Toaster
           theme="light"
-          position="bottom-right"
+          position="bottom-center"
           richColors
           toastOptions={{
             style: {
               borderRadius: "12px",
               fontSize: "13px",
+              marginBottom: "env(safe-area-inset-bottom, 0px)",
             },
           }}
         />

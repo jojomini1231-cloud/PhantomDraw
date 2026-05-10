@@ -290,7 +290,7 @@ export default function HistoryPage() {
                 return (
                   <div
                     key={task.id}
-                    className="group overflow-hidden rounded-xl border border-border bg-white shadow-sm transition-all duration-200 hover:shadow-md"
+                    className="group overflow-hidden rounded-xl border border-border bg-white shadow-sm transition-all duration-200 active:shadow-md sm:hover:shadow-md"
                   >
                     {/* Image area */}
                     <div className="relative flex aspect-square items-center justify-center bg-muted/30">
@@ -303,11 +303,11 @@ export default function HistoryPage() {
                             className="object-cover"
                             unoptimized
                           />
-                          <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                          <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/30 sm:bg-black/40 sm:opacity-0 sm:transition-opacity sm:duration-200 sm:group-hover:opacity-100">
                             <button
                               type="button"
                               onClick={() => handleRegenerate(task)}
-                              className="flex h-10 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-medium text-foreground shadow-lg transition-transform duration-200 hover:scale-105"
+                              className="flex h-10 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-medium text-foreground shadow-lg transition-transform duration-200 active:scale-105 sm:hover:scale-105"
                             >
                               <RefreshCw className="h-4 w-4" />
                               {t.histRegenerate}
@@ -318,7 +318,7 @@ export default function HistoryPage() {
                               rel="noreferrer"
                               download
                               aria-label={t.histDownload}
-                              className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-foreground shadow-lg transition-transform duration-200 hover:scale-105"
+                              className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-foreground shadow-lg transition-transform duration-200 active:scale-105 sm:hover:scale-105"
                             >
                               <Download className="h-5 w-5" />
                             </a>
@@ -387,7 +387,7 @@ export default function HistoryPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleRegenerate(task)}
-                        className="mt-3 h-8 w-full rounded-lg text-xs"
+                        className="mt-3 h-9 w-full rounded-lg text-xs"
                       >
                         <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                         {t.histRegenerate}

@@ -671,10 +671,10 @@ function WorkspacePageContent() {
       </aside>
 
       {/* Mobile Composer Toggle */}
-      <div className="fixed bottom-20 left-4 right-4 z-40 md:hidden">
+      <div className="fixed bottom-14 left-4 right-4 z-40 md:hidden">
         <Button
           onClick={() => setShowMobileComposer(!showMobileComposer)}
-          className="h-12 w-full rounded-lg bg-primary text-primary-foreground shadow-lg"
+          className="h-12 w-full rounded-xl bg-primary text-primary-foreground shadow-lg active:scale-[0.98] transition-transform"
         >
           <PenTool className="h-4 w-4 mr-2" />
           {t.wsPromptTitle}
@@ -683,9 +683,14 @@ function WorkspacePageContent() {
 
       {/* Mobile Composer Drawer */}
       {showMobileComposer && (
-        <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm md:hidden">
-          <div className="safe-bottom absolute bottom-0 left-0 right-0 max-h-[84vh] overflow-y-auto rounded-t-lg bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 border-b border-border bg-white p-4">
+        <div
+          className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm md:hidden sheet-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowMobileComposer(false);
+          }}
+        >
+          <div className="safe-bottom absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 border-b border-border bg-white px-4 pt-3 pb-3">
               <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted" />
               <div className="flex items-center justify-between">
                 <div>
@@ -694,41 +699,150 @@ function WorkspacePageContent() {
                   </p>
                   <h3 className="text-sm font-semibold">{t.wsPromptTitle}</h3>
                 </div>
-              <button
-                onClick={() => setShowMobileComposer(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label={language === "zh" ? "关闭创作面板" : "Close composer"}
-              >
-                <X className="h-5 w-5" />
-              </button>
+                <button
+                  onClick={() => setShowMobileComposer(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted"
+                  aria-label={language === "zh" ? "关闭创作面板" : "Close composer"}
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
             </div>
             <div className="p-4 space-y-4">
-              <Textarea
-                placeholder={t.wsPromptPlaceholder}
-                rows={20}
-                className="field-sizing-fixed max-h-[60vh] resize-none overflow-y-auto rounded-lg border-border bg-muted/25 text-sm scrollbar-thin"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-              />
-              <div className="grid gap-2">
-                {QUICK_PROMPTS.map((qp, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setPrompt(qp)}
-                    className="min-h-11 rounded-lg border border-border bg-muted/40 px-3 py-2 text-left text-xs leading-relaxed text-muted-foreground transition-all hover:border-brand/30 hover:bg-brand-light hover:text-foreground"
-                  >
-                    {qp}
-                  </button>
-                ))}
+              {/* Prompt textarea */}
+              <div className="relative">
+                <Textarea
+                  placeholder={t.wsPromptPlaceholder}
+                  rows={6}
+                  className="resize-none overflow-y-auto rounded-lg border-border bg-muted/25 p-3.5 text-sm leading-relaxed scrollbar-thin focus-visible:ring-2 focus-visible:ring-brand/25"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                />
+                <div className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-white/90 px-2 py-1 text-[10px] font-medium text-muted-foreground shadow-sm ring-1 ring-border/70">
+                  {promptCharCount} {language === "zh" ? "字" : "chars"}
+                </div>
               </div>
+
+              {/* Negative prompt (collapsible) */}
+              {!showNegative ? (
+                <button
+                  onClick={() => setShowNegative(true)}
+                  className="flex h-9 items-center gap-1.5 rounded-lg px-1 text-xs font-medium text-muted-foreground transition-colors active:text-foreground"
+                >
+                  <Plus className="h-3 w-3" />
+                  {t.wsNegativePromptBtn}
+                </button>
+              ) : (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                      <Ban className="h-3 w-3" />
+                      {t.wsNegativePromptTitle}
+                    </span>
+                    <button
+                      onClick={() => setShowNegative(false)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground active:bg-muted"
+                      aria-label={language === "zh" ? "关闭负面提示词" : "Close negative prompt"}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <Textarea
+                    placeholder={t.wsNegativePromptPlaceholder}
+                    rows={3}
+                    className="resize-none rounded-lg border-border bg-muted/25 p-3 text-sm focus-visible:ring-2 focus-visible:ring-brand/25"
+                    value={negativePrompt}
+                    onChange={(e) => setNegativePrompt(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {/* Image upload (compact) */}
+              {!initImage ? (
+                <label className="group flex h-16 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 transition-all active:border-purple/40 active:bg-muted/40">
+                  <Upload className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">
+                    {t.wsUploadImageDesc}
+                  </p>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast.error(
+                            language === "zh"
+                              ? "图片大小不能超过 5MB"
+                              : "Image size cannot exceed 5MB"
+                          );
+                          e.target.value = "";
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setInitImage(reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                </label>
+              ) : (
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-2">
+                  <Image
+                    src={initImage}
+                    alt="Reference"
+                    width={48}
+                    height={48}
+                    className="h-12 w-12 rounded-md object-cover"
+                    unoptimized
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">
+                      {language === "zh" ? "参考图片" : "Reference image"}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {language === "zh" ? "图生图模式" : "Image to image mode"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setInitImage(null)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground active:bg-muted"
+                    aria-label={t.wsRemoveImage}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Quick prompts */}
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+                  {t.wsQuickPrompts}
+                </p>
+                <div className="grid gap-2">
+                  {QUICK_PROMPTS.map((qp, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setPrompt(qp)}
+                      className="min-h-11 rounded-lg border border-border bg-muted/40 px-3 py-2 text-left text-xs leading-relaxed text-muted-foreground transition-all active:border-brand/30 active:bg-brand-light active:text-foreground"
+                    >
+                      {qp}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Generate button */}
               <Button
                 onClick={() => {
                   handleGenerate();
                   setShowMobileComposer(false);
                 }}
                 disabled={isGenerating || !promptReady}
-                className="h-12 w-full justify-between rounded-lg bg-primary px-4 text-primary-foreground"
+                className="h-12 w-full justify-between rounded-xl bg-primary px-4 text-primary-foreground active:scale-[0.98] transition-transform"
               >
                 <span className="flex items-center">
                   {isGenerating ? (
@@ -770,7 +884,7 @@ function WorkspacePageContent() {
           </div>
         </div>
 
-        <div className="studio-canvas flex-1 overflow-y-auto p-4 lg:p-6">
+        <div className="studio-canvas flex-1 overflow-y-auto p-3 pb-20 md:p-4 md:pb-4 lg:p-6">
           {/* Canvas Area */}
           <div className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center">
             {!currentTask ? (
@@ -797,12 +911,12 @@ function WorkspacePageContent() {
                         <button
                           key={i}
                           onClick={() => setPrompt(qp)}
-                          className="group flex min-h-[72px] items-start justify-between gap-3 rounded-lg border border-border bg-white p-3 text-left shadow-sm shadow-zinc-950/[0.02] transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-md"
+                          className="group flex min-h-[44px] sm:min-h-[72px] items-start justify-between gap-3 rounded-lg border border-border bg-white p-3 text-left shadow-sm shadow-zinc-950/[0.02] transition-all duration-200 active:-translate-y-0.5 active:border-brand/35 active:shadow-md sm:hover:-translate-y-0.5 sm:hover:border-brand/35 sm:hover:shadow-md"
                         >
-                          <p className="line-clamp-3 text-xs leading-relaxed text-foreground transition-colors group-hover:text-brand">
+                          <p className="line-clamp-2 sm:line-clamp-3 text-xs leading-relaxed text-foreground transition-colors group-active:text-brand sm:group-hover:text-brand">
                             {qp}
                           </p>
-                          <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-brand" />
+                          <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-all duration-200 group-active:translate-x-0.5 group-active:text-brand sm:group-hover:translate-x-0.5 sm:group-hover:text-brand" />
                         </button>
                       ))}
                     </div>
@@ -891,14 +1005,14 @@ function WorkspacePageContent() {
                         className="object-contain"
                         unoptimized
                       />
-                      <div className="absolute right-3 top-3 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                      <div className="absolute right-3 top-3 opacity-100 md:opacity-0 md:transition-opacity md:duration-200 md:group-hover:opacity-100">
                         <a
                           href={currentTask.imageUrl}
                           target="_blank"
                           rel="noreferrer"
                           download
                           aria-label={language === "zh" ? "下载图片" : "Download image"}
-                          className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-white/90 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-white"
+                          className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-white/90 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-white active:bg-white"
                         >
                           <Download className="h-4 w-4" />
                         </a>
@@ -919,7 +1033,7 @@ function WorkspacePageContent() {
         </div>
 
         {/* Bottom Status Bar */}
-        <div className="flex h-9 shrink-0 items-center justify-between border-t border-border bg-white px-4 text-[11px] text-muted-foreground lg:px-6">
+        <div className="flex h-9 shrink-0 items-center justify-between border-t border-border bg-white px-4 text-[11px] text-muted-foreground safe-area-bottom lg:px-6">
           <span className="font-mono opacity-60">
             PHANTOMDRAW v1.0
           </span>
