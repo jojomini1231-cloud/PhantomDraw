@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { useLangStore } from "@/store/langStore";
 import { translations } from "@/lib/i18n";
@@ -43,6 +43,16 @@ interface GalleryItem {
   isUnlocked?: boolean;
 }
 
+interface GalleryResponse {
+  items: GalleryItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+const PAGE_SIZE = 50;
+
 export default function GalleryPage() {
   const { token, updateQuota, quota } = useAuthStore();
   const { language } = useLangStore();
@@ -52,23 +62,36 @@ export default function GalleryPage() {
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState("全部");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
+  const activeCategoryRef = useRef(activeCategory);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const loadingMoreRef = useRef(false);
 
   const CATEGORIES = [
     { key: "全部", label: t.galAll },
-    { key: "人物", label: t.galCharacters },
-    { key: "风景", label: t.galScenery },
-    { key: "建筑", label: t.galArchitecture },
-    { key: "二次元", label: t.galAnime },
-    { key: "3D", label: t.gal3D },
-    { key: "摄影", label: t.galPhotography },
-    { key: "其他", label: t.galOther },
+    { key: "人像写真", label: t.galCatPortrait },
+    { key: "角色插画", label: t.galCatCharacterArt },
+    { key: "商业广告", label: t.galCatCommercial },
+    { key: "产品电商", label: t.galCatProduct },
+    { key: "品牌平面", label: t.galCatBranding },
+    { key: "UI社媒", label: t.galCatUiSocial },
+    { key: "信息图表", label: t.galCatInfographic },
+    { key: "国风文化", label: t.galCatChineseCulture },
+    { key: "城市空间", label: t.galCatCitySpace },
+    { key: "美食餐饮", label: t.galCatFood },
+    { key: "影视游戏", label: t.galCatFilmGame },
+    { key: "三维像素", label: t.galCat3DPixel },
+    { key: "艺术实验", label: t.galCatArtExperiment },
   ];
 
   useEffect(() => {
@@ -76,29 +99,120 @@ export default function GalleryPage() {
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  const fetchGallery = useCallback(async () => {
+  useEffect(() => {
+    activeCategoryRef.current = activeCategory;
+  }, [activeCategory]);
+
+  const fetchGallery = useCallback(async (
+    pageNum: number = 1,
+    mode: "replace" | "append" = "replace",
+  ) => {
+    const requestedCategory = activeCategory;
+    const isAppend = mode === "append";
+
+    if (isAppend && loadingMoreRef.current) {
+      return;
+    }
+
     try {
-      setLoading(true);
-      setError(null);
-      const url =
-        activeCategory === "全部"
-          ? "/gallery?limit=50"
-          : `/gallery?limit=50&category=${encodeURIComponent(activeCategory)}`;
-      const data = await fetchApi(url);
-      setItems(data.items);
+      if (isAppend) {
+        loadingMoreRef.current = true;
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setError(null);
+        setHasMore(false);
+      }
+
+      const params = new URLSearchParams({
+        page: String(pageNum),
+        limit: String(PAGE_SIZE),
+      });
+
+      if (activeCategory !== "全部") {
+        params.set("category", activeCategory);
+      }
+
+      const data: GalleryResponse = await fetchApi(`/gallery?${params.toString()}`);
+
+      if (requestedCategory !== activeCategoryRef.current) {
+        return;
+      }
+
+      const nextPage = data.page || pageNum;
+      const nextTotalPages = data.totalPages || 1;
+
+      setPage(nextPage);
+      setTotalPages(nextTotalPages);
+      setHasMore(nextPage < nextTotalPages);
+      setItems((currentItems) => {
+        if (!isAppend) {
+          return data.items;
+        }
+
+        const existingIds = new Set(currentItems.map((item) => item.id));
+        const nextItems = data.items.filter((item) => !existingIds.has(item.id));
+        return [...currentItems, ...nextItems];
+      });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load gallery");
+      if (!isAppend) {
+        setError(err instanceof Error ? err.message : "Failed to load gallery");
+      } else {
+        toast.error(err instanceof Error ? err.message : "Failed to load more");
+      }
     } finally {
-      setLoading(false);
+      if (isAppend) {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
     }
   }, [activeCategory]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      void fetchGallery();
+      setPage(1);
+      setTotalPages(1);
+      setHasMore(false);
+      void fetchGallery(1, "replace");
     });
     return () => window.cancelAnimationFrame(frame);
   }, [fetchGallery]);
+
+  const loadNextPage = useCallback(() => {
+    if (loading || loadingMore || !hasMore || page >= totalPages) {
+      return;
+    }
+
+    void fetchGallery(page + 1, "append");
+  }, [fetchGallery, hasMore, loading, loadingMore, page, totalPages]);
+
+  useEffect(() => {
+    if (!mounted || loading || !hasMore) {
+      return;
+    }
+
+    const target = loadMoreRef.current;
+    if (!target) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          loadNextPage();
+        }
+      },
+      {
+        rootMargin: "700px 0px",
+        threshold: 0.01,
+      },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, loadNextPage, loading, mounted]);
 
   const handleCardClick = async (item: GalleryItem) => {
     setSelectedItem(item);
@@ -138,7 +252,7 @@ export default function GalleryPage() {
       updateQuota(res.remainingQuota);
       toast.success(t.galUnlockSuccess);
 
-      fetchGallery();
+      void fetchGallery(1, "replace");
 
       const data = await fetchApi(`/gallery/${id}`);
       setSelectedItem(data);
@@ -186,7 +300,7 @@ export default function GalleryPage() {
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+        <div className="flex max-w-5xl flex-wrap items-center gap-x-2 gap-y-2 mb-8">
           {CATEGORIES.map((cat) => (
             <button
               key={cat.key}
@@ -225,7 +339,7 @@ export default function GalleryPage() {
                 : t.galErrorDesc}
             </p>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={fetchGallery}>
+              <Button variant="outline" onClick={() => fetchGallery(1, "replace")}>
                 <RefreshCw className="h-4 w-4 mr-1.5" />
                 {t.galRetry}
               </Button>
@@ -247,64 +361,79 @@ export default function GalleryPage() {
             </p>
           </div>
         ) : (
-          /* Masonry Grid */
-          <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-4 lg:gap-5 space-y-4 lg:space-y-5">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className="break-inside-avoid overflow-hidden rounded-xl bg-white border border-border shadow-sm transition-all duration-200 group cursor-pointer active:shadow-md sm:hover:shadow-md"
-                onClick={() => handleCardClick(item)}
-              >
-                {/* Image */}
-                <div className="relative overflow-hidden">
-                  <img
-                    src={item.imageUrl}
-                    alt={item.title}
-                    className="w-full h-auto object-cover min-h-[200px] bg-muted/30"
-                    loading="lazy"
-                  />
-                  {/* Hover overlay - always visible on mobile, hover on desktop */}
-                  <div className="absolute inset-0 bg-black/20 sm:bg-black/30 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-                    <div className="h-10 w-10 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center">
-                      <Eye className="h-5 w-5 text-foreground" />
+          <>
+            {/* Masonry Grid */}
+            <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-4 lg:gap-5 space-y-4 lg:space-y-5">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="break-inside-avoid overflow-hidden rounded-xl bg-white border border-border shadow-sm transition-all duration-200 group cursor-pointer active:shadow-md sm:hover:shadow-md"
+                  onClick={() => handleCardClick(item)}
+                >
+                  {/* Image */}
+                  <div className="relative overflow-hidden">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      className="w-full h-auto object-cover min-h-[200px] bg-muted/30"
+                      loading="lazy"
+                    />
+                    {/* Hover overlay - always visible on mobile, hover on desktop */}
+                    <div className="absolute inset-0 bg-black/20 sm:bg-black/30 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                      <div className="h-10 w-10 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center">
+                        <Eye className="h-5 w-5 text-foreground" />
+                      </div>
                     </div>
-                  </div>
-                  {/* Lock icon */}
-                  {!item.isUnlocked && item.type !== "free" && (
-                    <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-md rounded-lg p-1.5">
-                      <Lock className="h-3.5 w-3.5 text-white" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="p-3.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3
-                      className="font-medium text-sm line-clamp-1 flex-1"
-                      title={item.title}
-                    >
-                      {item.title}
-                    </h3>
-                    {item.type === "free" ? (
-                      <span className="text-[10px] font-semibold uppercase tracking-wider bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
-                        {t.galFree}
-                      </span>
-                    ) : item.isUnlocked ? (
-                      <span className="text-[10px] font-semibold uppercase tracking-wider bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1 shrink-0">
-                        <Unlock className="h-2.5 w-2.5" />
-                        {t.galUnlocked}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-semibold uppercase tracking-wider bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md border border-amber-200 shrink-0">
-                        {t.galPremiumPrompt}
-                      </span>
+                    {/* Lock icon */}
+                    {!item.isUnlocked && item.type !== "free" && (
+                      <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-md rounded-lg p-1.5">
+                        <Lock className="h-3.5 w-3.5 text-white" />
+                      </div>
                     )}
                   </div>
+
+                  {/* Info */}
+                  <div className="p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3
+                        className="font-medium text-sm line-clamp-1 flex-1"
+                        title={item.title}
+                      >
+                        {item.title}
+                      </h3>
+                      {item.type === "free" ? (
+                        <span className="text-[10px] font-semibold uppercase tracking-wider bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
+                          {t.galFree}
+                        </span>
+                      ) : item.isUnlocked ? (
+                        <span className="text-[10px] font-semibold uppercase tracking-wider bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1 shrink-0">
+                          <Unlock className="h-2.5 w-2.5" />
+                          {t.galUnlocked}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-semibold uppercase tracking-wider bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md border border-amber-200 shrink-0">
+                          {t.galPremiumPrompt}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            <div
+              ref={loadMoreRef}
+              aria-busy={loadingMore}
+              className="flex h-20 items-center justify-center"
+            >
+              {loadingMore && (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin text-purple" />
+                  <span className="sr-only">{t.galLoading}</span>
+                </>
+              )}
+            </div>
+          </>
         )}
       </div>
 

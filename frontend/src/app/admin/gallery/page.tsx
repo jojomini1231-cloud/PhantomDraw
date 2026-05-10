@@ -42,13 +42,27 @@ export default function GalleryManagement() {
     title: "",
     promptZh: "",
     promptEn: "",
-    category: "人物", // Default category
+    category: "人像写真", // Default category
     type: "free",     // 'free' or 'paid'
     unlockQuota: 0,
     isActive: true,
   });
 
-  const CATEGORIES = ["人物", "风景", "建筑", "二次元", "3D", "摄影", "其他"];
+  const CATEGORIES = [
+    "人像写真",
+    "角色插画",
+    "商业广告",
+    "产品电商",
+    "品牌平面",
+    "UI社媒",
+    "信息图表",
+    "国风文化",
+    "城市空间",
+    "美食餐饮",
+    "影视游戏",
+    "三维像素",
+    "艺术实验",
+  ];
 
   const fetchGallery = async (pageNum = 1, searchQuery = search) => {
     try {
