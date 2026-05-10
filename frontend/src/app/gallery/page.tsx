@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { useLangStore } from "@/store/langStore";
 import { translations } from "@/lib/i18n";
@@ -18,7 +18,6 @@ import {
   LayoutGrid,
   Eye,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { fetchApi } from "@/lib/api";
@@ -73,17 +72,11 @@ export default function GalleryPage() {
   ];
 
   useEffect(() => {
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => setMounted(true));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  useEffect(() => {
-    if (mounted && !token) {
-      router.replace("/login");
-    }
-  }, [mounted, token, router]);
-
-  const fetchGallery = async () => {
-    if (!token) return;
+  const fetchGallery = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -93,16 +86,19 @@ export default function GalleryPage() {
           : `/gallery?limit=50&category=${encodeURIComponent(activeCategory)}`;
       const data = await fetchApi(url);
       setItems(data.items);
-    } catch (err: any) {
-      setError(err.message || "Failed to load gallery");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load gallery");
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeCategory]);
 
   useEffect(() => {
-    fetchGallery();
-  }, [token, activeCategory]);
+    const frame = window.requestAnimationFrame(() => {
+      void fetchGallery();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [fetchGallery]);
 
   const handleCardClick = async (item: GalleryItem) => {
     setSelectedItem(item);
@@ -112,8 +108,8 @@ export default function GalleryPage() {
     try {
       const data = await fetchApi(`/gallery/${item.id}`);
       setSelectedItem(data);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load details");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to load details");
     } finally {
       setDetailLoading(false);
     }
@@ -125,6 +121,12 @@ export default function GalleryPage() {
   };
 
   const handleUnlock = async (id: string, requiredQuota: number) => {
+    if (!token) {
+      toast.info(t.galLoginRequired);
+      router.push("/login?redirect=%2Fgallery");
+      return;
+    }
+
     if (quota < requiredQuota) {
       toast.error(t.galUnlockFail);
       return;
@@ -140,8 +142,8 @@ export default function GalleryPage() {
 
       const data = await fetchApi(`/gallery/${id}`);
       setSelectedItem(data);
-    } catch (err: any) {
-      toast.error(err.message || "Unlock failed");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Unlock failed");
     } finally {
       setUnlocking(false);
     }
@@ -155,7 +157,7 @@ export default function GalleryPage() {
     }, 300);
   };
 
-  if (!mounted || !token) {
+  if (!mounted) {
     return (
       <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-canvas">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -189,10 +191,10 @@ export default function GalleryPage() {
             <button
               key={cat.key}
               onClick={() => setActiveCategory(cat.key)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 border ${
+              className={`px-4 h-9 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 border ${
                 activeCategory === cat.key
                   ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "bg-white text-muted-foreground border-border hover:text-foreground hover:border-foreground/20"
+                  : "bg-white text-muted-foreground border-border active:text-foreground active:border-foreground/20 sm:hover:text-foreground sm:hover:border-foreground/20"
               }`}
             >
               {cat.label}
@@ -250,7 +252,7 @@ export default function GalleryPage() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className="break-inside-avoid overflow-hidden rounded-xl bg-white border border-border shadow-sm hover:shadow-md transition-all duration-200 group cursor-pointer"
+                className="break-inside-avoid overflow-hidden rounded-xl bg-white border border-border shadow-sm transition-all duration-200 group cursor-pointer active:shadow-md sm:hover:shadow-md"
                 onClick={() => handleCardClick(item)}
               >
                 {/* Image */}
@@ -261,8 +263,8 @@ export default function GalleryPage() {
                     className="w-full h-auto object-cover min-h-[200px] bg-muted/30"
                     loading="lazy"
                   />
-                  {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                  {/* Hover overlay - always visible on mobile, hover on desktop */}
+                  <div className="absolute inset-0 bg-black/20 sm:bg-black/30 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                     <div className="h-10 w-10 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center">
                       <Eye className="h-5 w-5 text-foreground" />
                     </div>
@@ -308,20 +310,20 @@ export default function GalleryPage() {
 
       {/* Detail Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[1100px] p-0 overflow-hidden bg-white border-border shadow-2xl">
+        <DialogContent className="sm:max-w-[1100px] max-h-[90vh] sm:max-h-[85vh] p-0 overflow-hidden bg-white border-border shadow-2xl">
           {selectedItem && (
-            <div className="flex flex-col md:flex-row h-[85vh] sm:h-[80vh] max-h-[800px]">
+            <div className="flex flex-col md:flex-row h-[85vh] sm:h-[80vh] max-h-[750px]">
               {/* Image side */}
-              <div className="w-full md:w-[55%] bg-muted/20 relative min-h-[300px] md:min-h-full flex items-center justify-center">
+              <div className="w-full md:w-[55%] bg-muted/20 relative min-h-[250px] md:min-h-full flex items-center justify-center">
                 <img
                   src={selectedItem.imageUrl}
                   alt={selectedItem.title}
-                  className="w-full h-full object-contain absolute inset-0 p-4"
+                  className="w-full h-full object-contain absolute inset-0 p-3 md:p-4"
                 />
               </div>
 
               {/* Info side */}
-              <div className="w-full md:w-[45%] p-6 md:p-8 flex flex-col h-full overflow-y-auto">
+              <div className="w-full md:w-[45%] p-4 sm:p-6 md:p-8 flex flex-col h-full overflow-y-auto">
                 <DialogHeader className="mb-4 text-left">
                   <DialogTitle className="text-xl font-bold">
                     {selectedItem.title}
@@ -368,7 +370,7 @@ export default function GalleryPage() {
                         {t.galUnlockToView}
                       </h3>
                       <p className="text-sm text-muted-foreground mb-6 max-w-[260px]">
-                        {t.galUnlockHint}
+                        {token ? t.galUnlockHint : t.galLoginUnlockHint}
                       </p>
                       <Button
                         onClick={() =>
@@ -382,13 +384,17 @@ export default function GalleryPage() {
                       >
                         {unlocking ? (
                           <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : !token ? (
+                          <ArrowRight className="h-4 w-4 mr-2" />
                         ) : (
                           <Unlock className="h-4 w-4 mr-2" />
                         )}
-                        {t.galUnlockCost.replace(
-                          "{quota}",
-                          String(selectedItem.unlockQuota)
-                        )}
+                        {!token
+                          ? t.galLoginToUnlock
+                          : t.galUnlockCost.replace(
+                              "{quota}",
+                              String(selectedItem.unlockQuota)
+                            )}
                       </Button>
                     </div>
                   ) : (

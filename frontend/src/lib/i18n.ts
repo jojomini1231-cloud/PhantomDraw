@@ -125,10 +125,13 @@ export const translations = {
     galRetry: "重试",
     galUnlockBtn: "解锁",
     galUnlockCost: "支付 {quota} 额度解锁",
+    galLoginToUnlock: "登录后解锁",
+    galLoginRequired: "请先登录后再解锁高级提示词",
     galPromptEn: "英文提示词",
     galPromptZh: "中文提示词",
     galNoPrompt: "暂无提示词",
     galUnlockHint: "该作品使用了高级提示词，需要支付额度才能查看并使用",
+    galLoginUnlockHint: "高级提示词需要登录后解锁，登录后可继续支付额度查看并使用",
     galCategory: "分类",
 
     // Login Page
@@ -303,10 +306,13 @@ export const translations = {
     galRetry: "Retry",
     galUnlockBtn: "Unlock",
     galUnlockCost: "Pay {quota} quota to unlock",
+    galLoginToUnlock: "Log in to unlock",
+    galLoginRequired: "Please log in to unlock premium prompts",
     galPromptEn: "English Prompt",
     galPromptZh: "Chinese Prompt",
     galNoPrompt: "No prompt available",
     galUnlockHint: "This work uses a premium prompt that requires quota to view and use",
+    galLoginUnlockHint: "Premium prompts require login before you can unlock them with quota",
     galCategory: "Category",
 
     // Login Page

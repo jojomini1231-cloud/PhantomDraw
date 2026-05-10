@@ -60,9 +60,14 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ apiKey }),
       });
+      const redirect =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("redirect")
+          : null;
+      const nextPath = redirect?.startsWith("/") ? redirect : "/";
       setAuth(data.accessToken, apiKey, data.quota, data.multiplier);
       toast.success(t.loginSuccess);
-      router.push("/");
+      router.push(nextPath);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : t.loginFailed);
     } finally {
@@ -72,14 +77,14 @@ export default function LoginPage() {
 
   if (!mounted) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-canvas">
+      <div className="flex min-h-dvh items-center justify-center bg-canvas">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-canvas">
+    <div className="flex min-h-dvh bg-canvas">
       {/* Left: Brand Canvas */}
       <div className="hidden lg:flex lg:w-1/2 xl:w-[55%] relative overflow-hidden bg-primary">
         {/* Gradient mesh background */}
@@ -148,11 +153,11 @@ export default function LoginPage() {
       </div>
 
       {/* Right: Login Form */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-8 lg:p-12 relative">
+      <div className="flex-1 flex items-center justify-center p-5 sm:p-8 lg:p-12 relative">
         {/* Language toggle */}
         <button
           onClick={toggleLanguage}
-          className="absolute top-6 right-6 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
+          className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2 px-3 py-2 rounded-full bg-white border border-border text-sm text-muted-foreground active:text-foreground active:border-foreground/20 sm:hover:text-foreground sm:hover:border-foreground/20 transition-colors"
         >
           <Globe className="h-3.5 w-3.5" />
           {language === "zh" ? "EN" : "中文"}
@@ -160,7 +165,7 @@ export default function LoginPage() {
 
         <div className="w-full max-w-[400px]">
           {/* Mobile logo */}
-          <div className="flex items-center gap-3 mb-10 lg:hidden">
+          <div className="flex items-center gap-3 mb-6 sm:mb-8 lg:hidden">
             <div className="bg-primary rounded-xl p-2">
               <Hexagon className="h-5 w-5 text-primary-foreground fill-primary-foreground/20" />
             </div>
@@ -168,8 +173,8 @@ export default function LoginPage() {
           </div>
 
           {/* Header */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold tracking-tight mb-2">
+          <div className="mb-6 sm:mb-8">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight mb-2">
               {t.loginSubtitle}
             </h2>
             <p className="text-muted-foreground text-sm">
@@ -179,17 +184,17 @@ export default function LoginPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted/50 p-1 rounded-lg">
+            <TabsList className="grid w-full grid-cols-2 mb-5 sm:mb-6 bg-muted/50 p-1 rounded-lg">
               <TabsTrigger
                 value="login"
-                className="rounded-md text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                className="rounded-md text-sm h-10 data-[state=active]:bg-white data-[state=active]:shadow-sm"
               >
                 <Key className="h-3.5 w-3.5 mr-1.5" />
                 {t.loginTabLogin}
               </TabsTrigger>
               <TabsTrigger
                 value="generate"
-                className="rounded-md text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                className="rounded-md text-sm h-10 data-[state=active]:bg-white data-[state=active]:shadow-sm"
               >
                 <Sparkles className="h-3.5 w-3.5 mr-1.5" />
                 {t.loginTabGenerate}
@@ -256,7 +261,7 @@ export default function LoginPage() {
 
       {/* Contact Modal */}
       <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
-        <DialogContent className="sm:max-w-md bg-white border-border shadow-xl">
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-md bg-white border-border shadow-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
               <Key className="h-5 w-5 text-brand" />
@@ -268,7 +273,7 @@ export default function LoginPage() {
           </DialogHeader>
 
           <div className="flex flex-col gap-3 py-4">
-            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl border border-border hover:border-brand/30 transition-colors group cursor-pointer">
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl border border-border active:border-brand/30 sm:hover:border-brand/30 transition-colors group cursor-pointer">
               <div className="flex items-center gap-3">
                 <div className="bg-emerald-500 p-2 rounded-lg">
                   <MessageCircle className="h-4 w-4 text-white" />
@@ -280,7 +285,7 @@ export default function LoginPage() {
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl border border-border hover:border-purple/30 transition-colors group cursor-pointer">
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl border border-border active:border-purple/30 sm:hover:border-purple/30 transition-colors group cursor-pointer">
               <div className="flex items-center gap-3">
                 <div className="bg-blue-500 p-2 rounded-lg">
                   <MessageCircle className="h-4 w-4 text-white" />
