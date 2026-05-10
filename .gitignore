@@ -50,6 +50,9 @@ frontend/.env.tunnel
 *.db3
 database.sqlite
 
+# database backups
+*.backup-*
+
 # Editor directories and files
 .idea
 .vscode
