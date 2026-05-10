@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchAdminApi } from "@/lib/api";
+import { fetchAdminApi, resolveAssetUrl } from "@/lib/api";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -167,16 +167,19 @@ export default function GenerationLogs() {
                     </td>
                   </tr>
                 ) : (
-                  logs.map((log) => (
+                  logs.map((log) => {
+                    const imageUrl = resolveAssetUrl(log.imageUrl);
+
+                    return (
                     <tr key={log.id} className="bg-white hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4">
-                        {log.imageUrl ? (
+                        {imageUrl ? (
                           <div 
                             className="w-10 h-10 rounded-md overflow-hidden bg-slate-100 border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => openImage(log.imageUrl)}
+                            onClick={() => openImage(imageUrl)}
                           >
                             <Image 
-                              src={log.imageUrl} 
+                              src={imageUrl} 
                               alt="Generated" 
                               width={40} 
                               height={40}
@@ -221,7 +224,8 @@ export default function GenerationLogs() {
                         {new Date(log.createdAt).toLocaleString()}
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { useLangStore } from "@/store/langStore";
 import { translations } from "@/lib/i18n";
-import { fetchApi } from "@/lib/api";
+import { fetchApi, resolveAssetUrl } from "@/lib/api";
 import {
   Loader2,
   AlertCircle,
@@ -158,7 +158,7 @@ export default function HistoryPage() {
       JSON.stringify({
         prompt: task.prompt,
         negativePrompt: task.negativePrompt,
-        imageUrl: task.imageUrl,
+        imageUrl: resolveAssetUrl(task.imageUrl),
         taskId: task.id,
       })
     );
@@ -286,6 +286,7 @@ export default function HistoryPage() {
                 const errorSummary = compactText(
                   task.errorReason || t.histFailed
                 );
+                const imageUrl = resolveAssetUrl(task.imageUrl);
 
                 return (
                   <div
@@ -294,11 +295,11 @@ export default function HistoryPage() {
                   >
                     {/* Image area */}
                     <div className="relative flex aspect-square items-center justify-center bg-muted/30">
-                      {task.status === "success" && task.imageUrl ? (
+                      {task.status === "success" && imageUrl ? (
                         <>
                           <Image
-                            src={task.imageUrl}
-                            alt={task.prompt}
+                            src={imageUrl}
+                            alt="Generated image"
                             fill
                             className="object-cover"
                             unoptimized
@@ -313,7 +314,7 @@ export default function HistoryPage() {
                               {t.histRegenerate}
                             </button>
                             <a
-                              href={task.imageUrl}
+                              href={imageUrl}
                               target="_blank"
                               rel="noreferrer"
                               download

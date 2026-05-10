@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useLangStore } from "@/store/langStore";
 import { translations } from "@/lib/i18n";
-import { fetchApi } from "@/lib/api";
+import { fetchApi, resolveAssetUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -160,6 +160,7 @@ function WorkspacePageContent() {
       ? "文生图"
       : "Text to image";
   const generationQuotaCost = generationMode === "agent" ? 0 : Math.max(1, multiplier ?? 10);
+  const currentTaskImageUrl = resolveAssetUrl(currentTask?.imageUrl);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setMounted(true));
@@ -996,18 +997,18 @@ function WorkspacePageContent() {
                     </div>
                   )}
 
-                  {currentTask.imageUrl && (
+                  {currentTaskImageUrl && (
                     <div className="group relative h-full w-full overflow-hidden rounded-md bg-muted/20">
                       <Image
-                        src={currentTask.imageUrl}
-                        alt={currentTask.prompt || "Generated image"}
+                        src={currentTaskImageUrl}
+                        alt="Generated image"
                         fill
                         className="object-contain"
                         unoptimized
                       />
                       <div className="absolute right-3 top-3 opacity-100 md:opacity-0 md:transition-opacity md:duration-200 md:group-hover:opacity-100">
                         <a
-                          href={currentTask.imageUrl}
+                          href={currentTaskImageUrl}
                           target="_blank"
                           rel="noreferrer"
                           download
@@ -1076,22 +1077,26 @@ function WorkspacePageContent() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
-              {history.map((item, i) => (
-                <div
-                  key={i}
-                  className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg border border-border bg-muted/30 transition-all duration-200 hover:border-brand/35"
-                >
-                  {item.imageUrl && (
-                    <Image
-                      src={item.imageUrl}
-                      alt="History item"
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  )}
-                </div>
-              ))}
+              {history.map((item, i) => {
+                const historyImageUrl = resolveAssetUrl(item.imageUrl);
+
+                return (
+                  <div
+                    key={i}
+                    className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg border border-border bg-muted/30 transition-all duration-200 hover:border-brand/35"
+                  >
+                    {historyImageUrl && (
+                      <Image
+                        src={historyImageUrl}
+                        alt="History item"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
