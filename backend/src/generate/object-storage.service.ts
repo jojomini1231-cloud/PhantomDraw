@@ -123,6 +123,13 @@ export class ObjectStorageService implements OnModuleInit {
         response.headers.get('content-type')?.split(';')[0] ||
         this.detectMimeTypeFromPath(imageSource) ||
         'image/png';
+
+      if (!mimeType.toLowerCase().startsWith('image/')) {
+        throw new BadGatewayException(
+          `Generated image response was not an image: ${mimeType}`,
+        );
+      }
+
       const arrayBuffer = await response.arrayBuffer();
 
       return {

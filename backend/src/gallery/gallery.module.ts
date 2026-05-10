@@ -5,10 +5,11 @@ import { GalleryService } from './gallery.service';
 import { GalleryItem } from './entities/gallery-item.entity';
 import { GalleryUnlock } from './entities/gallery-unlock.entity';
 import { ApiKey } from '../auth/entities/api-key.entity';
+import { ObjectStorageService } from '../generate/object-storage.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([GalleryItem, GalleryUnlock, ApiKey])],
   controllers: [GalleryController],
-  providers: [GalleryService]
+  providers: [GalleryService, ObjectStorageService]
 })
 export class GalleryModule {}

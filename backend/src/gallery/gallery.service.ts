@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GalleryItem } from './entities/gallery-item.entity';
 import { GalleryUnlock } from './entities/gallery-unlock.entity';
 import { ApiKey } from '../auth/entities/api-key.entity';
+import { ObjectStorageService } from '../generate/object-storage.service';
 
 @Injectable()
 export class GalleryService {
@@ -14,6 +15,7 @@ export class GalleryService {
     private galleryUnlockRepository: Repository<GalleryUnlock>,
     @InjectRepository(ApiKey)
     private apiKeyRepository: Repository<ApiKey>,
+    private objectStorageService: ObjectStorageService,
   ) {}
 
   async findAll(page: number = 1, limit: number = 20, category?: string, userId?: string) {
@@ -92,6 +94,14 @@ export class GalleryService {
       ...item,
       isUnlocked: true
     };
+  }
+
+  async getGalleryAsset(filename: string) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.(png|jpe?g|webp|gif)$/i.test(filename)) {
+      throw new BadRequestException('Invalid gallery asset name');
+    }
+
+    return this.objectStorageService.getStoredImage(`gallery/${filename}`);
   }
 
   async unlock(id: string, userId: string) {
