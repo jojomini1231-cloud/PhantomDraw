@@ -60,6 +60,7 @@ database.sqlite
 *.sw?
 
 # Claude Code / Codex
+.agents/
 .claude/
 .codex
 
