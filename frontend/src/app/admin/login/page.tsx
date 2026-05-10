@@ -30,10 +30,15 @@ export default function AdminLogin() {
       // Get role from decoded JWT token manually, or backend can return it.
       // Let's decode token on client side
       const tokenPayload = JSON.parse(atob(data.accessToken.split(".")[1]));
+      const redirect =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("redirect")
+          : null;
+      const nextPath = redirect?.startsWith("/admin") ? redirect : "/admin";
       
       setAdminAuth(data.accessToken, username, tokenPayload.role);
       toast.success("管理员登录成功");
-      router.push("/admin");
+      router.push(nextPath);
     } catch (err: any) {
       toast.error(err.message || "登录失败");
     } finally {

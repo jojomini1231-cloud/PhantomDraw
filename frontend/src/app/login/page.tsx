@@ -281,7 +281,7 @@ export default function LoginPage() {
                 <span className="font-medium text-sm">{t.loginContactWeChat}</span>
               </div>
               <span className="text-muted-foreground font-mono text-sm select-all">
-                phantomdraw_ai
+                --
               </span>
             </div>
 
@@ -293,7 +293,7 @@ export default function LoginPage() {
                 <span className="font-medium text-sm">{t.loginContactQQ}</span>
               </div>
               <span className="text-muted-foreground font-mono text-sm select-all">
-                123456789
+                1911572936
               </span>
             </div>
           </div>
