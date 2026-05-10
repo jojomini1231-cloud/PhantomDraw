@@ -63,15 +63,18 @@ export class GalleryService {
     };
   }
 
-  async findOne(id: string, userId: string) {
+  async findOne(id: string, userId?: string) {
     const item = await this.galleryRepository.findOne({ where: { id, isActive: true } });
     if (!item) {
       throw new NotFoundException('画廊项不存在');
     }
 
-    const isUnlocked = item.type === 'free' || await this.galleryUnlockRepository.findOne({
-      where: { apiKeyId: userId, galleryItemId: id }
-    });
+    const isUnlocked =
+      item.type === 'free' ||
+      (Boolean(userId) &&
+        (await this.galleryUnlockRepository.findOne({
+          where: { apiKeyId: userId, galleryItemId: id },
+        })));
 
     if (!isUnlocked) {
       return {
