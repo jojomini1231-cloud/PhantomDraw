@@ -63,6 +63,15 @@ interface RegeneratePayload {
   imageUrl?: string | null;
 }
 
+interface ModelConfig {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
 function resolveWsUrl() {
   const configuredUrl = process.env.NEXT_PUBLIC_WS_URL;
   if (configuredUrl) {
@@ -109,20 +118,14 @@ function WorkspacePageContent() {
   const [currentTask, setCurrentTask] = useState<GenerationTask | null>(null);
   const [showNegative, setShowNegative] = useState(false);
   const [initImage, setInitImage] = useState<string | null>(null);
-  const [activeModel, setActiveModel] = useState("gpt-image-2");
+  const [models, setModels] = useState<ModelConfig[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [activeModel, setActiveModel] = useState("");
   const [size, setSize] = useState("1024x1024");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [generationMode, setGenerationMode] = useState<"normal" | "agent">("normal");
   const [history, setHistory] = useState<GenerationTask[]>([]);
   const [showMobileComposer, setShowMobileComposer] = useState(false);
-
-  const MODELS = [
-    {
-      id: "gpt-image-2",
-      name: "GPT-Image-2",
-      desc: language === "zh" ? "速度与质量的完美平衡" : "Perfect balance of speed and quality",
-    },
-  ];
 
   const QUICK_PROMPTS =
     language === "zh"
@@ -152,6 +155,10 @@ function WorkspacePageContent() {
   const socketRef = useRef<Socket | null>(null);
   const promptCharCount = prompt.length;
   const promptReady = prompt.trim().length > 0;
+  const hasAvailableModels = models.length > 0;
+  const getModelDisplayName = (slug?: string) =>
+    models.find((model) => model.slug === slug)?.name || slug || "-";
+  const activeModelName = getModelDisplayName(activeModel);
   const currentModeLabel = initImage
     ? language === "zh"
       ? "图生图"
@@ -166,6 +173,39 @@ function WorkspacePageContent() {
     const frame = window.requestAnimationFrame(() => setMounted(true));
     return () => window.cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const fetchModels = async () => {
+      try {
+        setModelsLoading(true);
+        const data = (await fetchApi("/models")) as ModelConfig[];
+        if (ignore) return;
+
+        setModels(data);
+        setActiveModel((current) => {
+          if (data.length === 0) return "";
+          if (current && data.some((model) => model.slug === current)) return current;
+          return data[0].slug;
+        });
+      } catch (error: unknown) {
+        if (!ignore) {
+          toast.error(getErrorMessage(error, language === "zh" ? "获取模型列表失败" : "Failed to load models"));
+        }
+      } finally {
+        if (!ignore) setModelsLoading(false);
+      }
+    };
+
+    if (mounted && token) {
+      void fetchModels();
+    }
+
+    return () => {
+      ignore = true;
+    };
+  }, [mounted, token, language]);
 
   useEffect(() => {
     if (mounted) {
@@ -233,15 +273,24 @@ function WorkspacePageContent() {
         }
       });
 
+      socketRef.current.on("quotaUpdate", ({ quota }: { quota: number }) => {
+        updateQuota(quota);
+      });
+
       return () => {
         socketRef.current?.disconnect();
       };
     }
-  }, [mounted, token, router, t.msgGenerateSuccess, t.msgGenerateFailed]);
+  }, [mounted, token, router, updateQuota, t.msgGenerateSuccess, t.msgGenerateFailed]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error(t.msgEnterPrompt);
+      return;
+    }
+
+    if (!activeModel) {
+      toast.error(language === "zh" ? "暂无可用模型" : "No available models");
       return;
     }
 
@@ -354,7 +403,7 @@ function WorkspacePageContent() {
                 {language === "zh" ? "模型" : "Model"}
               </p>
               <p className="mt-1 truncate text-xs font-semibold">
-                {activeModel}
+                {activeModelName}
               </p>
             </div>
           </div>
@@ -551,41 +600,54 @@ function WorkspacePageContent() {
               {t.wsModelTitle}
             </h3>
             <div className="grid grid-cols-1 gap-2">
-              {MODELS.map((model) => (
-                <button
-                  key={model.id}
-                  onClick={() => setActiveModel(model.id)}
-                  className={`flex min-h-[68px] items-center justify-between rounded-lg border px-3.5 py-3 text-left transition-all duration-200 ${
-                    activeModel === model.id
-                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                      : "border-border bg-white hover:border-foreground/20 hover:bg-muted/30"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span
-                      className={`text-sm font-medium ${
-                        activeModel === model.id
-                          ? "text-primary-foreground"
-                          : "text-foreground"
-                      }`}
-                    >
-                      {model.name}
-                    </span>
-                    <span
-                      className={`text-xs ${
-                        activeModel === model.id
-                          ? "text-primary-foreground/70"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {model.desc}
-                    </span>
-                  </div>
-                  {activeModel === model.id && (
-                    <CheckCircle2 className="h-4 w-4 text-primary-foreground" />
-                  )}
-                </button>
-              ))}
+              {modelsLoading ? (
+                <div className="flex min-h-[68px] items-center justify-center rounded-lg border border-border bg-muted/20 text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {language === "zh" ? "加载模型..." : "Loading models..."}
+                </div>
+              ) : models.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border bg-muted/20 px-3.5 py-4 text-xs leading-relaxed text-muted-foreground">
+                  {language === "zh"
+                    ? "暂无可用模型，请联系管理员在模型管理中启用模型。"
+                    : "No models are available. Ask an admin to enable models."}
+                </div>
+              ) : (
+                models.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => setActiveModel(model.slug)}
+                    className={`flex min-h-[68px] items-center justify-between rounded-lg border px-3.5 py-3 text-left transition-all duration-200 ${
+                      activeModel === model.slug
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                        : "border-border bg-white hover:border-foreground/20 hover:bg-muted/30"
+                    }`}
+                  >
+                    <div className="min-w-0 flex flex-col">
+                      <span
+                        className={`truncate text-sm font-medium ${
+                          activeModel === model.slug
+                            ? "text-primary-foreground"
+                            : "text-foreground"
+                        }`}
+                      >
+                        {model.name}
+                      </span>
+                      <span
+                        className={`mt-0.5 line-clamp-2 text-xs ${
+                          activeModel === model.slug
+                            ? "text-primary-foreground/70"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {model.description || model.slug}
+                      </span>
+                    </div>
+                    {activeModel === model.slug && (
+                      <CheckCircle2 className="ml-3 h-4 w-4 shrink-0 text-primary-foreground" />
+                    )}
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
@@ -643,7 +705,7 @@ function WorkspacePageContent() {
           </div>
           <Button
             onClick={handleGenerate}
-            disabled={isGenerating || !promptReady}
+            disabled={isGenerating || !promptReady || !hasAvailableModels}
             className="h-12 w-full justify-between rounded-lg bg-primary px-4 text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 disabled:opacity-50"
           >
             {isGenerating ? (
@@ -842,7 +904,7 @@ function WorkspacePageContent() {
                   handleGenerate();
                   setShowMobileComposer(false);
                 }}
-                disabled={isGenerating || !promptReady}
+                disabled={isGenerating || !promptReady || !hasAvailableModels}
                 className="h-12 w-full justify-between rounded-xl bg-primary px-4 text-primary-foreground active:scale-[0.98] transition-transform"
               >
                 <span className="flex items-center">
@@ -1039,7 +1101,7 @@ function WorkspacePageContent() {
             PHANTOMDRAW v1.0
           </span>
           <div className="flex items-center gap-4">
-            <span className="hidden font-medium sm:inline">{activeModel}</span>
+            <span className="hidden font-medium sm:inline">{activeModelName}</span>
             <div className="h-3 w-px bg-border" />
             <div className="flex items-center gap-2">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -1132,7 +1194,7 @@ function WorkspacePageContent() {
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">{t.wsParamModel}</span>
                   <span className="font-medium uppercase text-[11px]">
-                    {currentTask.model || activeModel}
+                    {getModelDisplayName(currentTask.model || activeModel)}
                   </span>
                 </div>
                 {currentTask.size && (
