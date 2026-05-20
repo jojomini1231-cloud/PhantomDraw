@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAdminAuthStore } from "@/store/adminAuthStore";
-import { ShieldAlert, Loader2, Key, LayoutDashboard, Image as ImageIcon, Server, FileText } from "lucide-react";
+import { ShieldAlert, Loader2, Key, LayoutDashboard, Image as ImageIcon, Server, FileText, BrainCircuit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -14,7 +14,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => setMounted(true));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
@@ -89,6 +90,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Button variant={pathname === "/admin/providers" ? "secondary" : "ghost"} className="gap-2">
                 <Server className="h-4 w-4" />
                 供应商管理
+              </Button>
+            </Link>
+            <Link href="/admin/models">
+              <Button variant={pathname === "/admin/models" ? "secondary" : "ghost"} className="gap-2">
+                <BrainCircuit className="h-4 w-4" />
+                模型管理
               </Button>
             </Link>
             <Link href="/admin/generation-logs">
