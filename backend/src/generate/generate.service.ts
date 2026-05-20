@@ -12,6 +12,7 @@ import { GenerationTask } from './entities/generation-task.entity';
 import { ApiKey } from '../auth/entities/api-key.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { ObjectStorageService } from './object-storage.service';
+import { ModelManagementService } from '../admin/model-management.service';
 
 @Injectable()
 export class GenerateService {
@@ -22,45 +23,53 @@ export class GenerateService {
     private apiKeyRepository: Repository<ApiKey>,
     @InjectQueue('image-generation') private imageQueue: Queue,
     private objectStorageService: ObjectStorageService,
+    private modelManagementService: ModelManagementService,
   ) {}
 
   async createTask(user: ApiKey, dto: CreateTaskDto) {
     const multiplier = Math.max(1, user.multiplier ?? 10);
+    const model = await this.modelManagementService.resolveActiveModelSlug(
+      dto.model,
+    );
     let task: GenerationTask | null = null;
     let remainingQuota = user.quota;
 
-    await this.apiKeyRepository.manager.transaction(async (transactionalEntityManager) => {
-      const latestUser = await transactionalEntityManager.findOne(ApiKey, {
-        where: { id: user.id },
-      });
+    await this.apiKeyRepository.manager.transaction(
+      async (transactionalEntityManager) => {
+        const latestUser = await transactionalEntityManager.findOne(ApiKey, {
+          where: { id: user.id },
+        });
 
-      if (!latestUser) {
-        throw new NotFoundException('API key not found');
-      }
+        if (!latestUser) {
+          throw new NotFoundException('API key not found');
+        }
 
-      if (latestUser.quota < multiplier) {
-        throw new BadRequestException('Insufficient quota');
-      }
+        if (latestUser.quota < multiplier) {
+          throw new BadRequestException('Insufficient quota');
+        }
 
-      latestUser.quota -= multiplier;
-      await transactionalEntityManager.save(latestUser);
+        latestUser.quota -= multiplier;
+        await transactionalEntityManager.save(latestUser);
 
-      task = transactionalEntityManager.create(GenerationTask, {
-        type: dto.type,
-        prompt: dto.prompt,
-        negativePrompt: dto.negativePrompt,
-        initImage: dto.initImage,
-        model: dto.model || 'gpt-image-2',
-        size: dto.size,
-        status: 'pending',
-        apiKey: latestUser,
-      });
-      task = await transactionalEntityManager.save(task);
-      remainingQuota = latestUser.quota;
-    });
+        task = transactionalEntityManager.create(GenerationTask, {
+          type: dto.type,
+          prompt: dto.prompt,
+          negativePrompt: dto.negativePrompt,
+          initImage: dto.initImage,
+          model,
+          size: dto.size,
+          status: 'pending',
+          apiKey: latestUser,
+        });
+        task = await transactionalEntityManager.save(task);
+        remainingQuota = latestUser.quota;
+      },
+    );
 
     if (!task) {
-      throw new ServiceUnavailableException('Task creation failed, please retry');
+      throw new ServiceUnavailableException(
+        'Task creation failed, please retry',
+      );
     }
 
     const createdTask = task as GenerationTask;
@@ -73,23 +82,33 @@ export class GenerateService {
       );
       console.log('Job added to queue:', job.id);
     } catch (error) {
-      await this.apiKeyRepository.manager.transaction(async (transactionalEntityManager) => {
-        await transactionalEntityManager.increment(
-          ApiKey,
-          { id: user.id },
-          'quota',
-          multiplier,
-        );
+      await this.apiKeyRepository.manager.transaction(
+        async (transactionalEntityManager) => {
+          await transactionalEntityManager.increment(
+            ApiKey,
+            { id: user.id },
+            'quota',
+            multiplier,
+          );
 
-        if (createdTask.id) {
-          await transactionalEntityManager.delete(GenerationTask, { id: createdTask.id });
-        }
-      });
+          if (createdTask.id) {
+            await transactionalEntityManager.delete(GenerationTask, {
+              id: createdTask.id,
+            });
+          }
+        },
+      );
 
-      throw new ServiceUnavailableException('Task queue unavailable, please retry');
+      throw new ServiceUnavailableException(
+        'Task queue unavailable, please retry',
+      );
     }
 
-    return { taskId: createdTask.id, status: createdTask.status, remainingQuota };
+    return {
+      taskId: createdTask.id,
+      status: createdTask.status,
+      remainingQuota,
+    };
   }
 
   async getTaskStatus(taskId: string, user: ApiKey) {
@@ -103,7 +122,7 @@ export class GenerateService {
 
     return task;
   }
-  
+
   async getHistory(
     user: ApiKey,
     options: { limit?: string; offset?: string } = {},

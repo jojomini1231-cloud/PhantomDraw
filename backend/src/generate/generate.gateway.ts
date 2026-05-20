@@ -43,4 +43,11 @@ export class GenerateGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.server.to(socketId).emit('taskUpdate', task);
     }
   }
+
+  sendQuotaUpdate(apiKey: string, quota: number) {
+    const socketId = this.userSockets.get(apiKey);
+    if (socketId) {
+      this.server.to(socketId).emit('quotaUpdate', { quota });
+    }
+  }
 }

@@ -6,6 +6,7 @@ import { GenerateService } from './generate.service';
 import { GenerationTask } from './entities/generation-task.entity';
 import { ApiKey } from '../auth/entities/api-key.entity';
 import { ObjectStorageService } from './object-storage.service';
+import { ModelManagementService } from '../admin/model-management.service';
 
 describe('GenerateService', () => {
   let service: GenerateService;
@@ -44,6 +45,12 @@ describe('GenerateService', () => {
           provide: ObjectStorageService,
           useValue: {
             getStoredImage: jest.fn(),
+          },
+        },
+        {
+          provide: ModelManagementService,
+          useValue: {
+            resolveActiveModelSlug: jest.fn().mockResolvedValue('gpt-image-2'),
           },
         },
       ],
