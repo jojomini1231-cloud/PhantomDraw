@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchAdminApi } from "@/lib/api";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Loader2, Plus, Search, Server, Trash2, Edit2, Power, PowerOff } from "lucide-react";
 
@@ -19,8 +21,30 @@ interface Provider {
   createdAt: string;
 }
 
+interface ProviderListResponse {
+  items: Provider[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+interface ModelOption {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "未知错误";
+}
+
 export default function ProvidersManagement() {
   const [providers, setProviders] = useState<Provider[]>([]);
+  const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -37,26 +61,89 @@ export default function ProvidersManagement() {
     isActive: true,
   });
 
-  const fetchProviders = async (pageNum = 1, searchQuery = search) => {
+  const fetchProviders = useCallback(async (pageNum = 1, searchQuery = search) => {
     try {
       setLoading(true);
-      const res = await fetchAdminApi(`/admin/providers?page=${pageNum}&limit=10&search=${searchQuery}`);
+      const res = await fetchAdminApi<ProviderListResponse>(
+        `/admin/providers?page=${pageNum}&limit=10&search=${encodeURIComponent(searchQuery)}`,
+      );
       setProviders(res.items);
       setTotalPages(res.totalPages);
       setPage(pageNum);
-    } catch (error: any) {
-      toast.error("获取供应商列表失败: " + error.message);
+    } catch (error: unknown) {
+      toast.error("获取供应商列表失败: " + getErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  };
+  }, [search]);
+
+  const fetchModelOptions = useCallback(async () => {
+    try {
+      const models = await fetchAdminApi<ModelOption[]>("/admin/models/options");
+      setModelOptions(models);
+    } catch (error: unknown) {
+      toast.error("获取模型选项失败: " + getErrorMessage(error));
+    }
+  }, []);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      fetchProviders(1, search);
+      void fetchProviders(1, search);
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [search]);
+  }, [fetchProviders, search]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      void fetchModelOptions();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [fetchModelOptions]);
+
+  const parseModelSlugs = (value?: string) =>
+    (value || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+  const getModelOption = (slug: string) =>
+    modelOptions.find((model) => model.slug === slug);
+
+  const toggleProviderModel = (slug: string, checked: boolean) => {
+    const selected = parseModelSlugs(currentProvider.model);
+    const next = checked
+      ? Array.from(new Set([...selected, slug]))
+      : selected.filter((item) => item !== slug);
+
+    setCurrentProvider({ ...currentProvider, model: next.join(",") });
+  };
+
+  const renderModelBadges = (modelValue: string) => {
+    const slugs = parseModelSlugs(modelValue);
+
+    if (slugs.length === 0) {
+      return <span className="text-slate-400">未配置</span>;
+    }
+
+    return (
+      <div className="flex max-w-[320px] flex-wrap gap-1.5">
+        {slugs.map((slug) => {
+          const option = getModelOption(slug);
+
+          return (
+            <Badge
+              key={slug}
+              variant={option?.isActive === false ? "outline" : "secondary"}
+              className="max-w-full"
+              title={slug}
+            >
+              <span className="truncate">{option?.name || slug}</span>
+            </Badge>
+          );
+        })}
+      </div>
+    );
+  };
 
   const handleSave = async () => {
     try {
@@ -74,9 +161,9 @@ export default function ProvidersManagement() {
         toast.success("供应商添加成功");
       }
       setIsDialogOpen(false);
-      fetchProviders(page);
-    } catch (error: any) {
-      toast.error("保存失败: " + error.message);
+      void fetchProviders(page);
+    } catch (error: unknown) {
+      toast.error("保存失败: " + getErrorMessage(error));
     }
   };
 
@@ -87,9 +174,9 @@ export default function ProvidersManagement() {
         body: JSON.stringify({ isActive: !currentStatus }),
       });
       toast.success(`供应商已${!currentStatus ? '启用' : '禁用'}`);
-      fetchProviders(page);
-    } catch (error: any) {
-      toast.error("操作失败: " + error.message);
+      void fetchProviders(page);
+    } catch (error: unknown) {
+      toast.error("操作失败: " + getErrorMessage(error));
     }
   };
 
@@ -100,9 +187,9 @@ export default function ProvidersManagement() {
         method: "DELETE",
       });
       toast.success("供应商已删除");
-      fetchProviders(page);
-    } catch (error: any) {
-      toast.error("删除失败: " + error.message);
+      void fetchProviders(page);
+    } catch (error: unknown) {
+      toast.error("删除失败: " + getErrorMessage(error));
     }
   };
 
@@ -185,7 +272,7 @@ export default function ProvidersManagement() {
                     <tr key={provider.id} className="bg-white hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-800">{provider.name}</td>
                       <td className="px-6 py-4 text-slate-500 max-w-[200px] truncate" title={provider.baseUrl}>{provider.baseUrl}</td>
-                      <td className="px-6 py-4 text-slate-500">{provider.model}</td>
+                      <td className="px-6 py-4 text-slate-500">{renderModelBadges(provider.model)}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${provider.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                           {provider.isActive ? '已启用' : '已禁用'}
@@ -290,12 +377,49 @@ export default function ProvidersManagement() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">支持的模型 (model)</label>
-              <Input
-                placeholder="例如：gpt-4o, claude-3-5-sonnet"
-                value={currentProvider.model || ""}
-                onChange={(e) => setCurrentProvider({ ...currentProvider, model: e.target.value })}
-              />
-              <p className="text-xs text-slate-500">可填入模型标识符，多个模型可以用逗号分隔</p>
+              {modelOptions.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+                  暂无模型选项，请先到模型管理中添加模型。
+                </div>
+              ) : (
+                <div className="max-h-56 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-3">
+                  {modelOptions.map((model) => {
+                    const checked = parseModelSlugs(currentProvider.model).includes(model.slug);
+
+                    return (
+                      <label
+                        key={model.id}
+                        className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) =>
+                            toggleProviderModel(model.slug, Boolean(value))
+                          }
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium text-slate-800">
+                              {model.name}
+                            </span>
+                            {!model.isActive && (
+                              <Badge variant="outline" className="shrink-0">
+                                已禁用
+                              </Badge>
+                            )}
+                          </span>
+                          <span className="mt-0.5 block truncate font-mono text-xs text-slate-500">
+                            {model.slug}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-xs text-slate-500">
+                选项来自模型管理；用户端只展示已启用模型。
+              </p>
             </div>
           </div>
           <DialogFooter>
