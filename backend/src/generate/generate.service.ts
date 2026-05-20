@@ -81,7 +81,7 @@ export class GenerateService {
         { jobId: createdTask.id },
       );
       console.log('Job added to queue:', job.id);
-    } catch (error) {
+    } catch {
       await this.apiKeyRepository.manager.transaction(
         async (transactionalEntityManager) => {
           await transactionalEntityManager.increment(

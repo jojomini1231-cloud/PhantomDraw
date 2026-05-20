@@ -21,26 +21,27 @@ export function readFileAsText(file: File): Promise<string> {
   });
 }
 
-export function getSessionAccessToken(payload: any): string | null {
+export function getSessionAccessToken(payload: unknown): string | null {
   if (typeof payload === "string") return payload;
   if (!payload || typeof payload !== "object") return null;
-  if (payload.accessToken) return String(payload.accessToken);
-  if (payload.access_token) return String(payload.access_token);
+  const obj = payload as Record<string, unknown>;
+  if (obj.accessToken) return String(obj.accessToken);
+  if (obj.access_token) return String(obj.access_token);
   return null;
 }
 
-export function getCpaAccessToken(payload: any): string | null {
-  // CPA files sometimes have access_token nested or the object itself might have different structures.
-  // The provided example has it at the top level as access_token.
-  if (typeof payload === "string") {
+export function getCpaAccessToken(payload: unknown): string | null {
+  let parsed: unknown = payload;
+  if (typeof parsed === "string") {
     try {
-      payload = JSON.parse(payload);
-    } catch (e) {
-      return payload;
+      parsed = JSON.parse(parsed);
+    } catch {
+      return parsed as string;
     }
   }
-  if (!payload || typeof payload !== "object") return null;
-  if (payload.access_token) return String(payload.access_token);
-  if (payload.accessToken) return String(payload.accessToken);
+  if (!parsed || typeof parsed !== "object") return null;
+  const obj = parsed as Record<string, unknown>;
+  if (obj.access_token) return String(obj.access_token);
+  if (obj.accessToken) return String(obj.accessToken);
   return null;
 }

@@ -15,13 +15,13 @@ export class GalleryManagementService {
 
     if (search) {
       query.where(
-        'gallery.title LIKE :search OR gallery.promptZh LIKE :search OR gallery.promptEn LIKE :search OR gallery.id LIKE :search OR gallery.category LIKE :search', 
-        { search: `%${search}%` }
+        'gallery.title LIKE :search OR gallery.promptZh LIKE :search OR gallery.promptEn LIKE :search OR gallery.id LIKE :search OR gallery.category LIKE :search',
+        { search: `%${search}%` },
       );
     }
 
     query.orderBy('gallery.createdAt', 'DESC');
-    
+
     const [items, total] = await query
       .skip((page - 1) * limit)
       .take(limit)

@@ -58,8 +58,8 @@ export default function GenerationLogs() {
       setLogs(res.items);
       setTotalPages(res.totalPages);
       setPage(pageNum);
-    } catch (error: any) {
-      toast.error("获取生成日志失败: " + error.message);
+    } catch (error: unknown) {
+      toast.error("获取生成日志失败: " + (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
     }

@@ -10,12 +10,21 @@ export class GenerationLogService {
     private taskRepository: Repository<GenerationTask>,
   ) {}
 
-  async findAll(page: number = 1, limit: number = 10, search?: string, status?: string) {
-    const query = this.taskRepository.createQueryBuilder('task')
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    status?: string,
+  ) {
+    const query = this.taskRepository
+      .createQueryBuilder('task')
       .leftJoinAndSelect('task.apiKey', 'apiKey');
 
     if (search) {
-      query.andWhere('(task.prompt LIKE :search OR task.id LIKE :search OR apiKey.key LIKE :search)', { search: `%${search}%` });
+      query.andWhere(
+        '(task.prompt LIKE :search OR task.id LIKE :search OR apiKey.key LIKE :search)',
+        { search: `%${search}%` },
+      );
     }
 
     if (status && status !== 'all') {
@@ -23,14 +32,15 @@ export class GenerationLogService {
     }
 
     query.orderBy('task.createdAt', 'DESC');
-    
+
     const [items, total] = await query
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
 
     // Remove the initImage to save bandwidth when listing logs
-    const sanitizedItems = items.map(item => {
+    const sanitizedItems = items.map((item) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { initImage, ...rest } = item;
       return rest;
     });

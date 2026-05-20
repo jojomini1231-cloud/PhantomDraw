@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
@@ -36,11 +40,13 @@ export class ApiKeyManagementService {
     const query = this.apiKeyRepository.createQueryBuilder('apiKey');
 
     if (search) {
-      query.where('apiKey.key LIKE :search OR apiKey.id LIKE :search', { search: `%${search}%` });
+      query.where('apiKey.key LIKE :search OR apiKey.id LIKE :search', {
+        search: `%${search}%`,
+      });
     }
 
     query.orderBy('apiKey.createdAt', 'DESC');
-    
+
     const [items, total] = await query
       .skip((page - 1) * limit)
       .take(limit)
@@ -68,7 +74,10 @@ export class ApiKeyManagementService {
     return this.updateKey(id, { quota: newQuota });
   }
 
-  async updateKey(id: string, updates: { quota?: number; multiplier?: number }) {
+  async updateKey(
+    id: string,
+    updates: { quota?: number; multiplier?: number },
+  ) {
     const key = await this.apiKeyRepository.findOne({ where: { id } });
     if (!key) {
       throw new NotFoundException('密钥不存在');
@@ -135,7 +144,9 @@ export class ApiKeyManagementService {
   }
 
   async getAllForExport() {
-    const items = await this.apiKeyRepository.find({ order: { createdAt: 'DESC' } });
+    const items = await this.apiKeyRepository.find({
+      order: { createdAt: 'DESC' },
+    });
     return items.map((item) => this.withDefaultMultiplier(item));
   }
 }

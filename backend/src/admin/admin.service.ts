@@ -1,4 +1,9 @@
-import { Injectable, Logger, UnauthorizedException, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  UnauthorizedException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -26,8 +31,12 @@ export class AdminService implements OnModuleInit {
       return;
     }
 
-    const bootstrapUsername = this.configService.get<string>('BOOTSTRAP_ADMIN_USERNAME')?.trim();
-    const bootstrapPassword = this.configService.get<string>('BOOTSTRAP_ADMIN_PASSWORD');
+    const bootstrapUsername = this.configService
+      .get<string>('BOOTSTRAP_ADMIN_USERNAME')
+      ?.trim();
+    const bootstrapPassword = this.configService.get<string>(
+      'BOOTSTRAP_ADMIN_PASSWORD',
+    );
 
     if (!bootstrapUsername || !bootstrapPassword) {
       this.logger.warn(
@@ -37,7 +46,9 @@ export class AdminService implements OnModuleInit {
     }
 
     if (bootstrapPassword.length < 12) {
-      this.logger.error('BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters long.');
+      this.logger.error(
+        'BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters long.',
+      );
       return;
     }
 
@@ -54,7 +65,9 @@ export class AdminService implements OnModuleInit {
   }
 
   async login(username: string, pass: string) {
-    const user = await this.adminUserRepository.findOne({ where: { username } });
+    const user = await this.adminUserRepository.findOne({
+      where: { username },
+    });
     if (!user) {
       throw new UnauthorizedException('无效的用户名或密码');
     }
@@ -73,7 +86,12 @@ export class AdminService implements OnModuleInit {
     return this.adminUserRepository.findOne({ where: { id } });
   }
 
-  async logAction(adminId: string, action: string, ipAddress: string, details?: any) {
+  async logAction(
+    adminId: string,
+    action: string,
+    ipAddress: string,
+    details?: any,
+  ) {
     const log = new AuditLog();
     log.adminId = adminId;
     log.action = action;

@@ -9,10 +9,14 @@ import {
   StreamableFile,
   UseGuards,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { GalleryService } from './gallery.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+
+interface AuthenticatedRequest extends Request {
+  user?: { id: string };
+}
 
 @Controller('gallery')
 export class GalleryController {
@@ -21,14 +25,19 @@ export class GalleryController {
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
   async getGallery(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('category') category?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 20;
-    return this.galleryService.findAll(pageNum, limitNum, category, req.user?.id);
+    return this.galleryService.findAll(
+      pageNum,
+      limitNum,
+      category,
+      req.user?.id,
+    );
   }
 
   @Get('assets/:filename')
@@ -45,13 +54,19 @@ export class GalleryController {
 
   @Get(':id')
   @UseGuards(OptionalJwtAuthGuard)
-  async getGalleryItem(@Req() req: any, @Param('id') id: string) {
+  async getGalleryItem(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
     return this.galleryService.findOne(id, req.user?.id);
   }
 
   @Post(':id/unlock')
   @UseGuards(JwtAuthGuard)
-  async unlockGalleryItem(@Req() req: any, @Param('id') id: string) {
-    return this.galleryService.unlock(id, req.user.id);
+  async unlockGalleryItem(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.galleryService.unlock(id, req.user!.id);
   }
 }

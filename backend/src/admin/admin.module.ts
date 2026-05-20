@@ -43,7 +43,7 @@ import { GenerationTask } from '../generate/entities/generation-task.entity';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('ADMIN_JWT_SECRET', 'admin-secret'),
         signOptions: { expiresIn: '1d' },
       }),

@@ -1,4 +1,7 @@
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -68,20 +71,20 @@ describe('GenerateService', () => {
     };
     const save = jest
       .fn()
-      .mockImplementationOnce(async (entity) => entity)
-      .mockImplementationOnce(async () => savedTask);
+      .mockImplementationOnce((entity: unknown) => Promise.resolve(entity))
+      .mockImplementationOnce(() => Promise.resolve(savedTask));
     const increment = jest.fn();
     const removeTask = jest.fn();
 
     apiKeyRepository.manager.transaction
-      .mockImplementationOnce(async (callback) =>
+      .mockImplementationOnce((callback: (em: unknown) => Promise<void>) =>
         callback({
           findOne: jest.fn().mockResolvedValue(savedUser),
           save,
           create: jest.fn().mockReturnValue(savedTask),
         }),
       )
-      .mockImplementationOnce(async (callback) =>
+      .mockImplementationOnce((callback: (em: unknown) => Promise<void>) =>
         callback({
           increment,
           delete: removeTask,
@@ -100,25 +103,30 @@ describe('GenerateService', () => {
       ),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
 
-    expect(increment).toHaveBeenCalledWith(ApiKey, { id: 'user-1' }, 'quota', 10);
+    expect(increment).toHaveBeenCalledWith(
+      ApiKey,
+      { id: 'user-1' },
+      'quota',
+      10,
+    );
     expect(removeTask).toHaveBeenCalledWith(GenerationTask, { id: 'task-1' });
   });
 
   it('should reject when quota is insufficient', async () => {
-    apiKeyRepository.manager.transaction.mockImplementationOnce(async (callback) =>
-      callback({
-        findOne: jest.fn().mockResolvedValue({ id: 'user-1', quota: 5, multiplier: 10 }),
-      }),
+    apiKeyRepository.manager.transaction.mockImplementationOnce(
+      (callback: (em: unknown) => Promise<void>) =>
+        callback({
+          findOne: jest
+            .fn()
+            .mockResolvedValue({ id: 'user-1', quota: 5, multiplier: 10 }),
+        }),
     );
 
     await expect(
-      service.createTask(
-        { id: 'user-1', quota: 5, multiplier: 10 } as ApiKey,
-        {
-          type: 'txt2img',
-          prompt: 'cat',
-        },
-      ),
+      service.createTask({ id: 'user-1', quota: 5, multiplier: 10 } as ApiKey, {
+        type: 'txt2img',
+        prompt: 'cat',
+      }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(imageQueue.add).not.toHaveBeenCalled();

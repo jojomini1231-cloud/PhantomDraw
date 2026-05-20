@@ -71,8 +71,8 @@ export default function GalleryManagement() {
       setItems(res.items);
       setTotalPages(res.totalPages);
       setPage(pageNum);
-    } catch (error: any) {
-      toast.error("获取画廊列表失败: " + error.message);
+    } catch (error: unknown) {
+      toast.error("获取画廊列表失败: " + (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
     }
@@ -111,8 +111,8 @@ export default function GalleryManagement() {
       }
       setIsFormOpen(false);
       fetchGallery(page);
-    } catch (error: any) {
-      toast.error("操作失败: " + error.message);
+    } catch (error: unknown) {
+      toast.error("操作失败: " + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -124,8 +124,8 @@ export default function GalleryManagement() {
       });
       toast.success(`状态已${!currentStatus ? '启用' : '禁用'}`);
       fetchGallery(page);
-    } catch (error: any) {
-      toast.error("操作失败: " + error.message);
+    } catch (error: unknown) {
+      toast.error("操作失败: " + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -137,8 +137,8 @@ export default function GalleryManagement() {
       });
       toast.success("画廊项已删除");
       fetchGallery(page);
-    } catch (error: any) {
-      toast.error("删除失败: " + error.message);
+    } catch (error: unknown) {
+      toast.error("删除失败: " + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -405,7 +405,7 @@ export default function GalleryManagement() {
                 <label className="text-sm font-medium text-slate-700">类型 <span className="text-red-500">*</span></label>
                 <Select
                   value={formData.type}
-                  onValueChange={(value: any) => {
+                  onValueChange={(value) => {
                     setFormData({ 
                       ...formData, 
                       type: value || 'free',

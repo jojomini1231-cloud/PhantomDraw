@@ -1,28 +1,39 @@
-import { WebSocketGateway, WebSocketServer, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+} from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { GenerationTask } from './entities/generation-task.entity';
 
 @WebSocketGateway({ cors: { origin: '*' } })
 @Injectable()
-export class GenerateGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class GenerateGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
-  private userSockets: Map<string, string> = new Map(); // apiKey -> socketId
+  private userSockets: Map<string, string> = new Map();
 
   constructor(private jwtService: JwtService) {}
 
-  async handleConnection(client: Socket) {
+  handleConnection(client: Socket) {
     try {
-      const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
+      const auth = client.handshake.auth as Record<string, string> | undefined;
+      const token =
+        auth?.token || client.handshake.headers.authorization?.split(' ')[1];
       if (!token) throw new Error('No token provided');
 
-      const payload = this.jwtService.verify(token);
+      const payload = this.jwtService.verify<{ key: string }>(token);
       this.userSockets.set(payload.key, client.id);
       console.log(`Client connected: ${payload.key} (${client.id})`);
     } catch (error) {
-      console.error('WebSocket connection rejected:', error.message);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('WebSocket connection rejected:', message);
       client.disconnect();
     }
   }
@@ -37,7 +48,7 @@ export class GenerateGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
-  sendTaskUpdate(apiKey: string, task: any) {
+  sendTaskUpdate(apiKey: string, task: GenerationTask) {
     const socketId = this.userSockets.get(apiKey);
     if (socketId) {
       this.server.to(socketId).emit('taskUpdate', task);

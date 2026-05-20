@@ -44,12 +44,16 @@ export class AccountPoolService {
   }
 
   async addAccounts(tokens: string[]) {
-    const cleanedTokens = [...new Set(tokens.map((t) => t.trim()).filter((t) => t))];
+    const cleanedTokens = [
+      ...new Set(tokens.map((t) => t.trim()).filter((t) => t)),
+    ];
     let added = 0;
     let skipped = 0;
 
     for (const token of cleanedTokens) {
-      const existing = await this.accountRepository.findOne({ where: { accessToken: token } });
+      const existing = await this.accountRepository.findOne({
+        where: { accessToken: token },
+      });
       if (existing) {
         skipped++;
       } else {
@@ -68,16 +72,23 @@ export class AccountPoolService {
   }
 
   async deleteAccounts(tokens: string[]) {
-    const targetSet = [...new Set(tokens.map((t) => t.trim()).filter((t) => t))];
-    if (targetSet.length === 0) return { removed: 0, items: await this.findAll() };
+    const targetSet = [
+      ...new Set(tokens.map((t) => t.trim()).filter((t) => t)),
+    ];
+    if (targetSet.length === 0)
+      return { removed: 0, items: await this.findAll() };
 
-    const result = await this.accountRepository.delete({ accessToken: In(targetSet) });
+    const result = await this.accountRepository.delete({
+      accessToken: In(targetSet),
+    });
     const items = await this.findAll();
     return { removed: result.affected || 0, items };
   }
 
   async updateAccount(accessToken: string, updates: Partial<Account>) {
-    const account = await this.accountRepository.findOne({ where: { accessToken } });
+    const account = await this.accountRepository.findOne({
+      where: { accessToken },
+    });
     if (!account) return null;
 
     Object.assign(account, updates);
@@ -86,9 +97,7 @@ export class AccountPoolService {
     return { items };
   }
 
-  async fetchRemoteInfo(accessToken: string) {
-    // Note: Node.js equivalent for fetch.
-    // To match chatgpt2api exact behavior, we would need TLS spoofing, but fetch with headers is a baseline.
+  async fetchRemoteInfo(accessToken: string): Promise<Partial<Account>> {
     const headers = {
       authorization: `Bearer ${accessToken}`,
       accept: '*/*',
@@ -100,7 +109,8 @@ export class AccountPoolService {
       'sec-fetch-dest': 'empty',
       'sec-fetch-mode': 'cors',
       'sec-fetch-site': 'same-origin',
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      'user-agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     };
 
     try {
@@ -110,51 +120,62 @@ export class AccountPoolService {
       if (meRes.status === 401) {
         throw new Error('/backend-api/me failed: HTTP 401');
       }
-      const mePayload = await meRes.json();
+      const mePayload = (await meRes.json()) as Record<string, unknown>;
 
-      const initRes = await fetch('https://chatgpt.com/backend-api/conversation/init', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          gizmo_id: null,
-          requested_default_model: null,
-          conversation_id: null,
-          timezone_offset_min: -480,
-        }),
-      });
-      const initPayload = await initRes.json();
+      const initRes = await fetch(
+        'https://chatgpt.com/backend-api/conversation/init',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            gizmo_id: null,
+            requested_default_model: null,
+            conversation_id: null,
+            timezone_offset_min: -480,
+          }),
+        },
+      );
+      const initPayload = (await initRes.json()) as Record<string, unknown>;
 
-      let limitsProgress = initPayload?.limits_progress;
-      if (!Array.isArray(limitsProgress)) limitsProgress = [];
+      const limitsProgress: unknown[] = Array.isArray(
+        initPayload?.limits_progress,
+      )
+        ? (initPayload.limits_progress as unknown[])
+        : [];
 
       let quota = 0;
-      let restoreAt = null;
-      for (const item of limitsProgress) {
+      let restoreAt: string | null = null;
+      for (const item of limitsProgress as Record<string, unknown>[]) {
         if (item?.feature_name === 'image_gen') {
-          quota = parseInt(item?.remaining || 0, 10);
-          restoreAt = item?.reset_after || null;
+          const remaining = item?.remaining;
+          quota = parseInt(
+            typeof remaining === 'string' || typeof remaining === 'number'
+              ? String(remaining)
+              : '0',
+            10,
+          );
+          restoreAt = (item?.reset_after as string) || null;
           break;
         }
       }
 
       let type = 'Free';
       if (mePayload?.email) {
-        // Just a simple detection for now
         type = mePayload?.has_active_subscription ? 'Plus' : 'Free';
       }
 
       return {
-        email: mePayload?.email,
-        userId: mePayload?.id,
+        email: mePayload?.email as string | undefined,
+        userId: mePayload?.id as string | undefined,
         type,
         quota,
-        limitsProgress,
-        defaultModelSlug: initPayload?.default_model_slug,
-        restoreAt,
+        limitsProgress: limitsProgress as any[],
+        defaultModelSlug: initPayload?.default_model_slug as string | undefined,
+        restoreAt: restoreAt ?? undefined,
         status: quota === 0 ? '限流' : '正常',
       };
     } catch (err) {
-      if (err.message.includes('401')) {
+      if (err instanceof Error && err.message.includes('401')) {
         return { status: '异常', quota: 0 };
       }
       throw err;
@@ -162,11 +183,14 @@ export class AccountPoolService {
   }
 
   async refreshAccounts(tokens: string[]) {
-    const cleanedTokens = [...new Set(tokens.map((t) => t.trim()).filter((t) => t))];
-    if (cleanedTokens.length === 0) return { refreshed: 0, errors: [], items: await this.findAll() };
+    const cleanedTokens = [
+      ...new Set(tokens.map((t) => t.trim()).filter((t) => t)),
+    ];
+    if (cleanedTokens.length === 0)
+      return { refreshed: 0, errors: [], items: await this.findAll() };
 
     let refreshed = 0;
-    const errors = [];
+    const errors: { access_token: string; error: string }[] = [];
 
     for (const token of cleanedTokens) {
       try {
@@ -174,8 +198,11 @@ export class AccountPoolService {
         await this.updateAccount(token, info);
         refreshed++;
       } catch (err) {
-        this.logger.error(`Failed to refresh token ${token.slice(0, 12)}: ${err.message}`);
-        errors.push({ access_token: token, error: err.message });
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.error(
+          `Failed to refresh token ${token.slice(0, 12)}: ${message}`,
+        );
+        errors.push({ access_token: token, error: message });
       }
     }
 

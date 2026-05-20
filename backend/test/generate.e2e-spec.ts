@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { AppModule } from './../src/app.module';
 import { ApiKey } from './../src/auth/entities/api-key.entity';
 import { io, Socket } from 'socket.io-client';
+import type { Server } from 'http';
 
 describe('Generate flow (e2e)', () => {
   let app: INestApplication;
@@ -24,11 +25,10 @@ describe('Generate flow (e2e)', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
     apiKeyRepository = app.get<Repository<ApiKey>>(getRepositoryToken(ApiKey));
-    
-    // We need to listen to a real port for WebSocket to work
+
     await app.listen(0);
     const serverUrl = await app.getUrl();
-    serverPort = parseInt(serverUrl.split(':').pop(), 10);
+    serverPort = parseInt(serverUrl.split(':').pop()!, 10);
   });
 
   afterAll(async () => {
@@ -39,13 +39,12 @@ describe('Generate flow (e2e)', () => {
   });
 
   it('should reject public API key self-service signup', async () => {
-    await request(app.getHttpServer())
+    await request(app.getHttpServer() as Server)
       .post('/auth/generate-key')
       .expect(403);
   });
 
   it('should authenticate, generate image and receive websocket progress', async () => {
-    // 1. Seed a test API Key internally instead of relying on the public signup endpoint.
     apiKey = `pd_${randomUUID().replace(/-/g, '')}`;
     await apiKeyRepository.save(
       apiKeyRepository.create({
@@ -57,15 +56,13 @@ describe('Generate flow (e2e)', () => {
     );
     expect(apiKey).toBeDefined();
 
-    // 2. Login to get JWT Token
-    const loginRes = await request(app.getHttpServer())
+    const loginRes = await request(app.getHttpServer() as Server)
       .post('/auth/login')
       .send({ apiKey })
       .expect(200);
-    authToken = loginRes.body.accessToken;
+    authToken = (loginRes.body as { accessToken: string }).accessToken;
     expect(authToken).toBeDefined();
 
-    // 3. Connect via WebSocket
     socket = io(`http://localhost:${serverPort}`, {
       auth: { token: authToken },
     });
@@ -76,21 +73,27 @@ describe('Generate flow (e2e)', () => {
     });
     expect(connected).toBe(true);
 
-    // 4. Trigger image generation and wait for events
-    const updates: any[] = [];
-    const donePromise = new Promise((resolve, reject) => {
-      socket.on('taskUpdate', (task) => {
-        console.log('Received taskUpdate:', task.status);
-        updates.push(task.status);
-        if (task.status === 'success' || task.status === 'failed') {
-          resolve(task);
-        }
-      });
-      // fallback timeout
-      setTimeout(() => reject(new Error('timeout waiting for taskUpdate')), 8000);
-    });
+    const updates: string[] = [];
+    const donePromise = new Promise<{ status: string; imageUrl?: string }>(
+      (resolve, reject) => {
+        socket.on(
+          'taskUpdate',
+          (task: { status: string; imageUrl?: string }) => {
+            console.log('Received taskUpdate:', task.status);
+            updates.push(task.status);
+            if (task.status === 'success' || task.status === 'failed') {
+              resolve(task);
+            }
+          },
+        );
+        setTimeout(
+          () => reject(new Error('timeout waiting for taskUpdate')),
+          8000,
+        );
+      },
+    );
 
-    const generateRes = await request(app.getHttpServer())
+    const generateRes = await request(app.getHttpServer() as Server)
       .post('/generate')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
@@ -99,17 +102,16 @@ describe('Generate flow (e2e)', () => {
       })
       .expect(201);
 
-    expect(generateRes.body.taskId).toBeDefined();
-    expect(generateRes.body.status).toBe('pending');
+    const generateBody = generateRes.body as { taskId: string; status: string };
+    expect(generateBody.taskId).toBeDefined();
+    expect(generateBody.status).toBe('pending');
 
-    // 5. Wait for WebSocket progress
-    const finalTask: any = await donePromise;
+    const finalTask = await donePromise;
 
     expect(finalTask.status).toBe('success');
     expect(finalTask.imageUrl).toBeDefined();
-    
-    // We should have received 'running' before 'success'
+
     expect(updates).toContain('running');
     expect(updates).toContain('success');
-  }, 10000); // Give it enough timeout for generation simulation
+  }, 10000);
 });

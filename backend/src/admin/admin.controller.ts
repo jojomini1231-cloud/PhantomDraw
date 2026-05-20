@@ -1,4 +1,11 @@
-import { Controller, Post, Body, Get, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminAuthGuard } from './guards/admin-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -10,14 +17,14 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Post('login')
-  async login(@Body() body: any) {
+  async login(@Body() body: { username: string; password: string }) {
     return this.adminService.login(body.username, body.password);
   }
 
   @UseGuards(AdminAuthGuard, RolesGuard)
   @UseInterceptors(AuditLogInterceptor)
   @Get('dashboard')
-  async getDashboard() {
+  getDashboard() {
     return { message: '欢迎来到管理控制台！' };
   }
 
@@ -25,7 +32,7 @@ export class AdminController {
   @Roles('superadmin')
   @UseInterceptors(AuditLogInterceptor)
   @Post('settings')
-  async updateSettings(@Body() body: any) {
+  updateSettings(@Body() body: Record<string, unknown>) {
     return { message: '系统设置更新成功', settings: body };
   }
 }

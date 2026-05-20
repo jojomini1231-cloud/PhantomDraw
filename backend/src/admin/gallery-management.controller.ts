@@ -1,5 +1,17 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { GalleryManagementService } from './gallery-management.service';
+import { GalleryItem } from '../gallery/entities/gallery-item.entity';
 import { AdminAuthGuard } from './guards/admin-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { AuditLogInterceptor } from './interceptors/audit-log.interceptor';
@@ -22,15 +34,12 @@ export class GalleryManagementController {
   }
 
   @Post()
-  async create(@Body() body: any) {
+  async create(@Body() body: Partial<GalleryItem>) {
     return this.galleryService.create(body);
   }
 
   @Put(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
+  async update(@Param('id') id: string, @Body() body: Partial<GalleryItem>) {
     return this.galleryService.update(id, body);
   }
 

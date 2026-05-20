@@ -13,7 +13,9 @@ export class AuthService {
   ) {}
 
   async login(keyString: string) {
-    const apiKey = await this.apiKeyRepository.findOne({ where: { key: keyString } });
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { key: keyString },
+    });
     if (!apiKey) {
       throw new UnauthorizedException('Invalid API Key');
     }

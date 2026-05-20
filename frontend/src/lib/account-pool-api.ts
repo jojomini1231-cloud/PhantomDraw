@@ -11,7 +11,7 @@ export type Account = {
   quota: number;
   email?: string | null;
   userId?: string | null;
-  limitsProgress?: Array<any>;
+  limitsProgress?: Array<Record<string, unknown>>;
   defaultModelSlug?: string | null;
   restoreAt?: string | null;
   success: number;

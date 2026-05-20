@@ -76,7 +76,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     try {
       const authStorage = JSON.parse(authStorageStr);
       token = authStorage?.state?.token;
-    } catch (e) {}
+    } catch { /* ignore parse errors */ }
   }
 
   const headers = {
@@ -95,7 +95,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     try {
       const errorData = await response.json();
       errorMsg = errorData.message || errorMsg;
-    } catch (e) {}
+    } catch { /* ignore parse errors */ }
     if (response.status === 401) {
       redirectToLoginAfterUnauthorized('user', endpoint);
     }
@@ -105,6 +105,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   return response.json();
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchAdminApi<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const authStorageStr = typeof window !== 'undefined' ? localStorage.getItem('phantom-draw-admin-auth') : null;
   let token = null;
@@ -113,7 +114,7 @@ export async function fetchAdminApi<T = any>(endpoint: string, options: RequestI
     try {
       const authStorage = JSON.parse(authStorageStr);
       token = authStorage?.state?.token;
-    } catch (e) {}
+    } catch { /* ignore parse errors */ }
   }
 
   const headers = {
@@ -132,7 +133,7 @@ export async function fetchAdminApi<T = any>(endpoint: string, options: RequestI
     try {
       const errorData = await response.json();
       errorMsg = errorData.message || errorMsg;
-    } catch (e) {}
+    } catch { /* ignore parse errors */ }
     if (response.status === 401) {
       redirectToLoginAfterUnauthorized('admin', endpoint);
     }

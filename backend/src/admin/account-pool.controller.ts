@@ -1,5 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { AccountPoolService } from './account-pool.service';
+import { Account } from './entities/account.entity';
 import { AdminAuthGuard } from './guards/admin-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
@@ -32,7 +42,7 @@ export class AccountPoolController {
   @Roles('admin', 'superadmin')
   async updateAccount(
     @Param('token') token: string,
-    @Body() updates: any,
+    @Body() updates: Partial<Account>,
   ) {
     return this.accountPoolService.updateAccount(token, updates);
   }

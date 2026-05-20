@@ -18,8 +18,8 @@ export default function AdminDashboard() {
       try {
         const res = await fetchAdminApi("/admin/dashboard");
         setData(res);
-      } catch (error: any) {
-        toast.error("加载仪表盘失败: " + error.message);
+      } catch (error: unknown) {
+        toast.error("加载仪表盘失败: " + (error instanceof Error ? error.message : String(error)));
       } finally {
         setLoading(false);
       }
@@ -34,8 +34,8 @@ export default function AdminDashboard() {
         body: JSON.stringify({ theme: "dark" }),
       });
       toast.success(res.message);
-    } catch (error: any) {
-      toast.error("操作失败: " + error.message);
+    } catch (error: unknown) {
+      toast.error("操作失败: " + (error instanceof Error ? error.message : String(error)));
     }
   };
 

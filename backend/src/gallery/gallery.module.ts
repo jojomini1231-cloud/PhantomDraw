@@ -10,6 +10,6 @@ import { ObjectStorageService } from '../generate/object-storage.service';
 @Module({
   imports: [TypeOrmModule.forFeature([GalleryItem, GalleryUnlock, ApiKey])],
   controllers: [GalleryController],
-  providers: [GalleryService, ObjectStorageService]
+  providers: [GalleryService, ObjectStorageService],
 })
 export class GalleryModule {}

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GalleryItem } from './entities/gallery-item.entity';
@@ -18,8 +22,14 @@ export class GalleryService {
     private objectStorageService: ObjectStorageService,
   ) {}
 
-  async findAll(page: number = 1, limit: number = 20, category?: string, userId?: string) {
-    const query = this.galleryRepository.createQueryBuilder('gallery')
+  async findAll(
+    page: number = 1,
+    limit: number = 20,
+    category?: string,
+    userId?: string,
+  ) {
+    const query = this.galleryRepository
+      .createQueryBuilder('gallery')
       .select([
         'gallery.id',
         'gallery.title',
@@ -27,7 +37,7 @@ export class GalleryService {
         'gallery.type',
         'gallery.unlockQuota',
         'gallery.category',
-        'gallery.createdAt'
+        'gallery.createdAt',
       ])
       .where('gallery.isActive = :isActive', { isActive: true });
 
@@ -46,14 +56,14 @@ export class GalleryService {
     let unlockedItemIds: string[] = [];
     if (userId && items.length > 0) {
       const unlocks = await this.galleryUnlockRepository.find({
-        where: { apiKeyId: userId }
+        where: { apiKeyId: userId },
       });
-      unlockedItemIds = unlocks.map(u => u.galleryItemId);
+      unlockedItemIds = unlocks.map((u) => u.galleryItemId);
     }
 
-    const itemsWithUnlockStatus = items.map(item => ({
+    const itemsWithUnlockStatus = items.map((item) => ({
       ...item,
-      isUnlocked: item.type === 'free' || unlockedItemIds.includes(item.id)
+      isUnlocked: item.type === 'free' || unlockedItemIds.includes(item.id),
     }));
 
     return {
@@ -66,7 +76,9 @@ export class GalleryService {
   }
 
   async findOne(id: string, userId?: string) {
-    const item = await this.galleryRepository.findOne({ where: { id, isActive: true } });
+    const item = await this.galleryRepository.findOne({
+      where: { id, isActive: true },
+    });
     if (!item) {
       throw new NotFoundException('画廊项不存在');
     }
@@ -86,13 +98,13 @@ export class GalleryService {
         type: item.type,
         unlockQuota: item.unlockQuota,
         category: item.category,
-        isUnlocked: false
+        isUnlocked: false,
       };
     }
 
     return {
       ...item,
-      isUnlocked: true
+      isUnlocked: true,
     };
   }
 
@@ -105,7 +117,9 @@ export class GalleryService {
   }
 
   async unlock(id: string, userId: string) {
-    const item = await this.galleryRepository.findOne({ where: { id, isActive: true } });
+    const item = await this.galleryRepository.findOne({
+      where: { id, isActive: true },
+    });
     if (!item) {
       throw new NotFoundException('画廊项不存在');
     }
@@ -115,7 +129,7 @@ export class GalleryService {
     }
 
     const existingUnlock = await this.galleryUnlockRepository.findOne({
-      where: { apiKeyId: userId, galleryItemId: id }
+      where: { apiKeyId: userId, galleryItemId: id },
     });
 
     if (existingUnlock) {
@@ -132,17 +146,19 @@ export class GalleryService {
     }
 
     // Use transaction to ensure data consistency
-    await this.apiKeyRepository.manager.transaction(async transactionalEntityManager => {
-      user.quota -= item.unlockQuota;
-      await transactionalEntityManager.save(user);
+    await this.apiKeyRepository.manager.transaction(
+      async (transactionalEntityManager) => {
+        user.quota -= item.unlockQuota;
+        await transactionalEntityManager.save(user);
 
-      const unlockRecord = this.galleryUnlockRepository.create({
-        apiKeyId: userId,
-        galleryItemId: id,
-        cost: item.unlockQuota,
-      });
-      await transactionalEntityManager.save(unlockRecord);
-    });
+        const unlockRecord = this.galleryUnlockRepository.create({
+          apiKeyId: userId,
+          galleryItemId: id,
+          cost: item.unlockQuota,
+        });
+        await transactionalEntityManager.save(unlockRecord);
+      },
+    );
 
     return { success: true, remainingQuota: user.quota };
   }

@@ -14,11 +14,14 @@ export class ProviderManagementService {
     const query = this.providerRepository.createQueryBuilder('provider');
 
     if (search) {
-      query.where('provider.name LIKE :search OR provider.baseUrl LIKE :search OR provider.model LIKE :search', { search: `%${search}%` });
+      query.where(
+        'provider.name LIKE :search OR provider.baseUrl LIKE :search OR provider.model LIKE :search',
+        { search: `%${search}%` },
+      );
     }
 
     query.orderBy('provider.createdAt', 'DESC');
-    
+
     const [items, total] = await query
       .skip((page - 1) * limit)
       .take(limit)

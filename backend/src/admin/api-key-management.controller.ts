@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ApiKeyManagementService } from './api-key-management.service';
 import { AdminAuthGuard } from './guards/admin-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -35,10 +46,7 @@ export class ApiKeyManagementController {
   }
 
   @Put(':id/quota')
-  async updateQuota(
-    @Param('id') id: string,
-    @Body('quota') quota: number,
-  ) {
+  async updateQuota(@Param('id') id: string, @Body('quota') quota: number) {
     return this.apiKeyService.updateQuota(id, quota);
   }
 

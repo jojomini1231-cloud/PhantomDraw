@@ -17,10 +17,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: any) {
+  async validate(payload: { sub: string }) {
     const user = await this.authService.validateUser(payload.sub);
     if (!user) {
-      throw new UnauthorizedException('User no longer exists or API key revoked');
+      throw new UnauthorizedException(
+        'User no longer exists or API key revoked',
+      );
     }
     return user;
   }

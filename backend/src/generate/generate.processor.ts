@@ -27,7 +27,7 @@ export class GenerateProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<any, any, string>): Promise<any> {
+  async process(job: Job<{ taskId: string }>): Promise<void> {
     console.log('Processor started for job:', job.id, job.data);
     const { taskId } = job.data;
     const task = await this.taskRepository.findOne({
@@ -103,9 +103,11 @@ export class GenerateProcessor extends WorkerHost {
 
           success = true;
           break;
-        } catch (error: any) {
-          console.error(`Provider ${provider.name} failed:`, error.message);
-          lastError = error;
+        } catch (error: unknown) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          console.error(`Provider ${provider.name} failed:`, message);
+          lastError = error instanceof Error ? error : new Error(message);
         }
       }
 
@@ -165,13 +167,14 @@ export class GenerateProcessor extends WorkerHost {
       task.providerName = 'ChatGPT Pool';
       await this.taskRepository.save(task);
       this.gateway.sendTaskUpdate(task.apiKey.key, task);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Generation failed:', error);
       if (account) {
         await this.accountPoolService.incrementFail(account.id);
       }
       task.status = 'failed';
-      task.errorReason = error.message || 'Unknown error';
+      task.errorReason =
+        error instanceof Error ? error.message : 'Unknown error';
       await this.taskRepository.save(task);
       await this.refundQuota(task);
       this.gateway.sendTaskUpdate(task.apiKey.key, task);
@@ -192,7 +195,8 @@ export class GenerateProcessor extends WorkerHost {
       where: { id: task.apiKey.id },
       select: ['id', 'quota'],
     });
-    task.apiKey.quota = refundedApiKey?.quota ?? task.apiKey.quota + refundAmount;
+    task.apiKey.quota =
+      refundedApiKey?.quota ?? task.apiKey.quota + refundAmount;
     this.gateway.sendQuotaUpdate(task.apiKey.key, task.apiKey.quota);
   }
 
@@ -226,7 +230,9 @@ export class GenerateProcessor extends WorkerHost {
       throw new Error(`API Error: ${response.status} - ${errorData}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as {
+      data?: Array<{ url?: string; b64_json?: string }>;
+    };
     if (data.data && data.data.length > 0 && data.data[0].url) {
       return data.data[0].url;
     } else if (data.data && data.data.length > 0 && data.data[0].b64_json) {
@@ -266,7 +272,7 @@ export class GenerateProcessor extends WorkerHost {
       headers: {
         Authorization: `Bearer ${provider.key}`,
       },
-      body: formData as any,
+      body: formData as unknown as BodyInit,
     });
 
     if (!response.ok) {
@@ -274,7 +280,9 @@ export class GenerateProcessor extends WorkerHost {
       throw new Error(`API Error: ${response.status} - ${errorData}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as {
+      data?: Array<{ url?: string; b64_json?: string }>;
+    };
     if (data.data && data.data.length > 0 && data.data[0].url) {
       return data.data[0].url;
     } else if (data.data && data.data.length > 0 && data.data[0].b64_json) {

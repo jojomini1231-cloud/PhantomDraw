@@ -51,7 +51,8 @@ export class ObjectStorageService implements OnModuleInit {
     taskId: string,
     imageSource: string,
   ): Promise<{ storageKey: string; imageUrl: string }> {
-    const { buffer, mimeType, extension } = await this.loadImageSource(imageSource);
+    const { buffer, mimeType, extension } =
+      await this.loadImageSource(imageSource);
     const storageKey = this.buildStorageKey(taskId, extension);
 
     await this.client.send(
@@ -70,7 +71,9 @@ export class ObjectStorageService implements OnModuleInit {
     };
   }
 
-  async getStoredImage(storageKey: string): Promise<{ buffer: Buffer; contentType: string }> {
+  async getStoredImage(
+    storageKey: string,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
     try {
       const response = await this.client.send(
         new GetObjectCommand({
@@ -88,8 +91,15 @@ export class ObjectStorageService implements OnModuleInit {
         buffer: Buffer.from(bytes),
         contentType: response.ContentType || 'application/octet-stream',
       };
-    } catch (error: any) {
-      if (error?.$metadata?.httpStatusCode === 404 || error?.name === 'NoSuchKey') {
+    } catch (error: unknown) {
+      const s3Error = error as {
+        $metadata?: { httpStatusCode?: number };
+        name?: string;
+      };
+      if (
+        s3Error?.$metadata?.httpStatusCode === 404 ||
+        s3Error?.name === 'NoSuchKey'
+      ) {
         throw new NotFoundException('Stored image not found');
       }
 
@@ -100,12 +110,21 @@ export class ObjectStorageService implements OnModuleInit {
   private async ensureBucketExists() {
     try {
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
-    } catch (error: any) {
-      if (error?.$metadata?.httpStatusCode !== 404 && error?.name !== 'NotFound') {
+    } catch (error: unknown) {
+      const s3Error = error as {
+        $metadata?: { httpStatusCode?: number };
+        name?: string;
+      };
+      if (
+        s3Error?.$metadata?.httpStatusCode !== 404 &&
+        s3Error?.name !== 'NotFound'
+      ) {
         throw error;
       }
 
-      this.logger.log(`Bucket ${this.bucket} not found. Creating it on ${this.endpointUrl}.`);
+      this.logger.log(
+        `Bucket ${this.bucket} not found. Creating it on ${this.endpointUrl}.`,
+      );
       await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
     }
   }
@@ -116,7 +135,9 @@ export class ObjectStorageService implements OnModuleInit {
     if (/^https?:\/\//i.test(imageSource)) {
       const response = await fetch(imageSource);
       if (!response.ok) {
-        throw new BadGatewayException(`Failed to download generated image: ${response.status}`);
+        throw new BadGatewayException(
+          `Failed to download generated image: ${response.status}`,
+        );
       }
 
       const mimeType =
@@ -139,7 +160,9 @@ export class ObjectStorageService implements OnModuleInit {
       };
     }
 
-    const dataUrlMatch = imageSource.match(/^data:(image\/[\w.+-]+);base64,(.*)$/s);
+    const dataUrlMatch = imageSource.match(
+      /^data:(image\/[\w.+-]+);base64,(.*)$/s,
+    );
     if (dataUrlMatch) {
       const mimeType = dataUrlMatch[1];
       const base64Payload = dataUrlMatch[2];
@@ -200,13 +223,16 @@ export class ObjectStorageService implements OnModuleInit {
   }
 
   private resolveEndpointUrl(): string {
-    const rawEndpoint = this.configService.get<string>('S3_ENDPOINT', '127.0.0.1').trim();
+    const rawEndpoint = this.configService
+      .get<string>('S3_ENDPOINT', '127.0.0.1')
+      .trim();
     if (/^https?:\/\//i.test(rawEndpoint)) {
       return rawEndpoint.replace(/\/+$/, '');
     }
 
     const port = this.configService.get<string>('S3_PORT', '9000');
-    const useSsl = this.configService.get<string>('S3_USE_SSL', 'false') === 'true';
+    const useSsl =
+      this.configService.get<string>('S3_USE_SSL', 'false') === 'true';
     return `${useSsl ? 'https' : 'http'}://${rawEndpoint}${port ? `:${port}` : ''}`;
   }
 

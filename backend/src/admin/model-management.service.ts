@@ -284,7 +284,10 @@ export class ModelManagementService implements OnModuleInit {
     }
   }
 
-  private async replaceProviderModelSlug(previousSlug: string, nextSlug: string) {
+  private async replaceProviderModelSlug(
+    previousSlug: string,
+    nextSlug: string,
+  ) {
     const providers = await this.providerRepository.find();
 
     for (const provider of providers) {
@@ -293,9 +296,7 @@ export class ModelManagementService implements OnModuleInit {
 
       provider.model = Array.from(
         new Set(
-          models.map((model) =>
-            model === previousSlug ? nextSlug : model,
-          ),
+          models.map((model) => (model === previousSlug ? nextSlug : model)),
         ),
       ).join(',');
       await this.providerRepository.save(provider);

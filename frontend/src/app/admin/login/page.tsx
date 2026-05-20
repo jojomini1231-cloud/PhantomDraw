@@ -39,8 +39,8 @@ export default function AdminLogin() {
       setAdminAuth(data.accessToken, username, tokenPayload.role);
       toast.success("管理员登录成功");
       router.push(nextPath);
-    } catch (err: any) {
-      toast.error(err.message || "登录失败");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "登录失败");
     } finally {
       setLoading(false);
     }

@@ -10,10 +10,15 @@ import {
   StreamableFile,
   UseGuards,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { GenerateService } from './generate.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ApiKey } from '../auth/entities/api-key.entity';
+
+interface AuthenticatedRequest extends Request {
+  user: ApiKey;
+}
 
 @Controller('generate')
 export class GenerateController {
@@ -21,14 +26,17 @@ export class GenerateController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  async createTask(@Req() req: any, @Body() dto: CreateTaskDto) {
+  async createTask(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateTaskDto,
+  ) {
     return this.generateService.createTask(req.user, dto);
   }
 
   @Get('history')
   @UseGuards(JwtAuthGuard)
   async getHistory(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
@@ -49,7 +57,10 @@ export class GenerateController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
-  async getTaskStatus(@Req() req: any, @Param('id') id: string) {
+  async getTaskStatus(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
     return this.generateService.getTaskStatus(id, req.user);
   }
 }

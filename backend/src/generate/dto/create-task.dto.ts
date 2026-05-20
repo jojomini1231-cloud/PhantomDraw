@@ -12,7 +12,7 @@ export class CreateTaskDto {
   @IsString()
   @IsIn(['txt2img', 'img2img'])
   type: string = 'txt2img';
-  
+
   @IsString()
   @IsOptional()
   style?: string;

@@ -13,15 +13,18 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('ADMIN_JWT_SECRET', 'admin-secret'),
+      secretOrKey: configService.get<string>(
+        'ADMIN_JWT_SECRET',
+        'admin-secret',
+      ),
     });
   }
 
-  async validate(payload: any) {
+  async validate(payload: { sub: string }) {
     const user = await this.adminService.validateUser(payload.sub);
     if (!user) {
       throw new UnauthorizedException('管理员用户不存在或已失效');
     }
-    return user; // Attached to request as req.user
+    return user;
   }
 }
