@@ -46,6 +46,7 @@ services:
       - PORT=3008
       - NODE_ENV=production
       - APP_VERSION=${APP_VERSION:-dev}
+      - REQUEST_BODY_LIMIT=${REQUEST_BODY_LIMIT:-15mb}
       - DB_TYPE=sqlite
       - DB_DATABASE=${DB_DATABASE:-/app/data/database.sqlite}
       - REDIS_HOST=redis

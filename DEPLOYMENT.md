@@ -107,7 +107,7 @@ cp .env.example .env
 # Edit .env with your values (at minimum: JWT_SECRET, S3 credentials, AI_API_URL)
 # Local MinIO example:
 # BACKEND_PUBLIC_URL=http://localhost:3001
-# S3_ENDPOINT=http://192.168.0.103:19000
+# S3_ENDPOINT=http://127.0.0.1:19000
 # S3_ACCESS_KEY=minioadmin
 # S3_SECRET_KEY=minioadmin123
 # S3_BUCKET=phantomdraw

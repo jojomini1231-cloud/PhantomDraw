@@ -1,11 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.setGlobalPrefix('api');
+  const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || '15mb';
   const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:4322')
     .split(',')
     .map((origin) => origin.trim())
@@ -13,6 +15,9 @@ async function bootstrap() {
 
   // Security
   app.use(helmet());
+
+  app.use(json({ limit: requestBodyLimit }));
+  app.use(urlencoded({ limit: requestBodyLimit, extended: true }));
 
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
   app.enableCors({
