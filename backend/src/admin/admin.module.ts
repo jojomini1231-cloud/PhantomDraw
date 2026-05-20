@@ -20,13 +20,26 @@ import { AccountPoolService } from './account-pool.service';
 import { Provider } from './entities/provider.entity';
 import { ProviderManagementController } from './provider-management.controller';
 import { ProviderManagementService } from './provider-management.service';
+import { ModelConfig } from './entities/model-config.entity';
+import { ModelCatalogController } from './model-catalog.controller';
+import { ModelManagementController } from './model-management.controller';
+import { ModelManagementService } from './model-management.service';
 import { GenerationLogController } from './generation-log.controller';
 import { GenerationLogService } from './generation-log.service';
 import { GenerationTask } from '../generate/entities/generation-task.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AdminUser, AuditLog, ApiKey, GalleryItem, Account, Provider, GenerationTask]),
+    TypeOrmModule.forFeature([
+      AdminUser,
+      AuditLog,
+      ApiKey,
+      GalleryItem,
+      Account,
+      Provider,
+      ModelConfig,
+      GenerationTask,
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -36,8 +49,31 @@ import { GenerationTask } from '../generate/entities/generation-task.entity';
       }),
     }),
   ],
-  controllers: [AdminController, ApiKeyManagementController, GalleryManagementController, AccountPoolController, ProviderManagementController, GenerationLogController],
-  providers: [AdminService, AdminJwtStrategy, ApiKeyManagementService, GalleryManagementService, AccountPoolService, ProviderManagementService, GenerationLogService],
-  exports: [AdminService, AccountPoolService, ProviderManagementService],
+  controllers: [
+    AdminController,
+    ApiKeyManagementController,
+    GalleryManagementController,
+    AccountPoolController,
+    ProviderManagementController,
+    ModelManagementController,
+    ModelCatalogController,
+    GenerationLogController,
+  ],
+  providers: [
+    AdminService,
+    AdminJwtStrategy,
+    ApiKeyManagementService,
+    GalleryManagementService,
+    AccountPoolService,
+    ProviderManagementService,
+    ModelManagementService,
+    GenerationLogService,
+  ],
+  exports: [
+    AdminService,
+    AccountPoolService,
+    ProviderManagementService,
+    ModelManagementService,
+  ],
 })
 export class AdminModule {}
